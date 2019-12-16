@@ -1,0 +1,6 @@
+bloat
+*.docx
+*.pdf
+.venv
+Dummy
+*.tiff
