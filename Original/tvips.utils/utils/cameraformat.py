@@ -1,5 +1,5 @@
 ﻿import tifffile
-from . import em
+from tvips.utils import em
 from tifffile import FileHandle
 
 class TvipsCameraFormat(object):

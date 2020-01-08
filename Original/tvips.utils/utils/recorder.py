@@ -3,18 +3,11 @@ import os.path
 from tifffile import FileHandle
 import math
 import gc
-import sys
-import argparse
-import tifffile
-from types import SimpleNamespace
-
-from enum import Enum
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-from .imagefun import (scale16to8, bin2, getElectronWavelength, gausfilter,
-medfilter)#, cnnfilter)
+from .imagefun import scale16to8, bin2, getElectronWavelength
 
 TVIPS_RECORDER_GENERAL_HEADER = [
     ('size', 'u4'),
@@ -55,10 +48,9 @@ TVIPS_RECORDER_FRAME_HEADER = [
     #for header version 2, some more data might be present
     ]
 
-
 class Recorder(object):
 
-    def __init__(self, filename, filterfunc=None, numframes=None, framerecord=None):
+    def __init__(self, filename, scalefunc=None, numframes=None, framerecord=None):
         assert os.path.exists(filename)
         assert filename.endswith(".tvips")
 
@@ -66,53 +58,38 @@ class Recorder(object):
         self.dtype = None
         self.frameHeader = list()
         self.frames = None
-        self.filterfunc = filterfunc
+        self.scalefunc = scalefunc
         self.numframes = numframes
 
         self.frameshape = None
-        self.framerecord = framerecord
 
         #find numerical prefix
         part = int(filename[-9:-6])
         if part != 0:
             raise ValueError("Can only read video sequences starting with part 000")
 
-        if self.numframes is not None: #read only the first self.numframes from the first data
-            fn = filename[:-9]+"{:03d}.tvips".format(0)
-            #logging.info("Opening file")
-            frames, headers = self._readIndividualFile(fn, part)
-            #logging.info("Succes reading frames from file")
-            #merge memory efficient
-            self.frames = np.asarray(frames)
-            self.frameHeader.extend(headers)
+        try:
+            while True:
+                fn = filename[:-9]+"{:03d}.tvips".format(part)
 
-        else:
-            try:
-                while True:
-                    fn = filename[:-9]+"{:03d}.tvips".format(part)
+                if not os.path.exists(fn):
+                    break
 
-                    if not os.path.exists(fn):
-                        break
+                frames, headers = self._readIndividualFile(fn, part)
 
-                    #logging.info("Opening file")
-                    frames, headers = self._readIndividualFile(fn, part)
-                    #logging.info("Succes reading frames from file")
-                    #merge memory efficient
-                    if (part==0):
-                        self.frames = np.asarray(frames)
-                    else:
-                        self.frames = np.append(self.frames, frames, axis=0)
+                #merge memory efficient
+                if (part==0):
+                    self.frames = np.asarray(frames)
+                else:
+                    self.frames = np.append(self.frames, frames, axis=0)
 
-                    self.frameHeader.extend(headers)
-                    part += 1
-                    #logging.info("End of file loop")
+                self.frameHeader.extend(headers)
+                part += 1
 
-                #logging.info("Finished reading file")
+        except StopIteration:
+            pass
 
-            except StopIteration:
-                pass
-        logging.debug("Type of self.frames: {}".format(type(self.frames)))
-        print ("Read {} frame(s) successfully".format(len(self.frames)))
+        print ("Read {} frames successfully".format(len(self.frames)))
 
     def _readIndividualFile(self, fn, part):
         logging.info("Reading {}".format(fn))
@@ -128,18 +105,11 @@ class Recorder(object):
             if part == 0:
                 self._readGeneral(fh)
 
-
             #respect desire not to read everything
             if self.numframes is not None:
-                logging.debug("We use {} numframes".format(self.numframes))
                 for j in range(self.numframes):
-                    #actually add to frames
-                    frame, header = self._readFrame(fh)
-
-                    frames.append(frame)
-                    frame_headers.append(header)
-                return frames, frame_headers
-                raise StopIteration() #to stop loop over files also
+                    self._readFrame(fh, framerecord)
+                raise StopIteration()
             else:
                 #read all frames
                 while fh.tell() < fh.size:
@@ -147,13 +117,12 @@ class Recorder(object):
 
                     frames.append(frame)
                     frame_headers.append(header)
-
         return frames, frame_headers
 
 
     def _readGeneral(self, fh):
         self.general = fh.read_record(TVIPS_RECORDER_GENERAL_HEADER)
-        #changed np.uint16 to np.int16
+
         self.dtype = np.uint8 if self.general.bitsperpixel == 8 else np.uint16
         self.frameshape = (self.general.dimx, self.general.dimy)
 
@@ -184,18 +153,13 @@ class Recorder(object):
         #read frame
         frame = np.fromfile(fh,
                     count=self.general.dimx*self.general.dimy,
-                    dtype=np.int16
-                    ) #dtype=self.dtype,
+                    dtype=self.dtype
+                    )
         frame.shape = (self.general.dimx, self.general.dimy)
-        # add line to make negative pixel values 0
-        #frame = np.where(frame>0, frame, 0)
-        #frame[frame<0] = 0
-        #frame.astype(self.dtype)
-        #logging.info("Did we edit this file?")
         logging.debug("Starting filters")
 
-        if self.filterfunc is not None:
-            frame = self.filterfunc(frame).astype(np.uint8)
+        if self.scalefunc is not None:
+            frame = self.scalefunc(frame).astype(np.uint8)
 
         logging.debug("Finished filters")
         return frame, header
@@ -205,51 +169,53 @@ class Recorder(object):
 
 
 
-# def main_spill_to_directory():
-#     import sys
-#     assert len(sys.argv) == 3
-#
-#     #first arg: .tvips file
-#     #second arg: directory to spill the .tif files
-#
-#     import os
-#     if not os.path.exists(sys.argv[2]):
-#         os.mkdir(sys.argv[2])
-#
-#     import tifffile
-#
-#     print("Reading in file {}.".format(sys.argv[1]))
-#     rec = Recorder(sys.argv[1])
-#
-#     numframes = len(rec.frames)
-#
-#     amount_of_digits = len(str(numframes-1))
-#
-#     logging.debug("Start writing individual tif files to {}".format(sys.argv[2]))
-#
-#     filename = "frame_{:0" + str(amount_of_digits) + "d}.tif"
-#     filename = os.path.join(sys.argv[2], filename)
-#
-#     for i, frame in enumerate(rec.frames):
-#
-#         tifffile.imsave(filename.format(i), frame)
-#
-#     print ("Done saving {:d} frames to {}.".format(i+1, sys.argv[2]))
 
+def main_spill_to_directory():
+    import sys
+    assert len(sys.argv) == 3
 
-class OutputTypes(Enum):
-    IndividualTiff="Individual"
-    TiffStack = "TiffStack"
-    TestFile = "TestFile"
-    Blockfile = "blo"
-    VirtualBF = "VirtualBF"
+    #first arg: .tvips file
+    #second arg: directory to spill the .tif files
 
-    def __str__(self):
-        return self.value
+    import os
+    if not os.path.exists(sys.argv[2]):
+        os.mkdir(sys.argv[2])
 
-def main(opts):
+    import tifffile
 
-    logging.debug(str(opts))
+    print("Reading in file {}.".format(sys.argv[1]))
+    rec = Recorder(sys.argv[1])
+
+    numframes = len(rec.frames)
+
+    amount_of_digits = len(str(numframes-1))
+
+    logging.debug("Start writing individual tif files to {}".format(sys.argv[2]))
+
+    filename = "frame_{:0" + str(amount_of_digits) + "d}.tif"
+    filename = os.path.join(sys.argv[2], filename)
+
+    for i, frame in enumerate(rec.frames):
+
+        tifffile.imsave(filename.format(i), frame)
+
+    print ("Done saving {:d} frames to {}.".format(i+1, sys.argv[2]))
+
+def main():
+    import sys
+    import argparse
+    import tifffile
+
+    from enum import Enum
+
+    class OutputTypes(Enum):
+        IndividualTiff="Individual"
+        TiffStack = "TiffStack"
+        Blockfile = "blo"
+        VirtualBF = "VirtualBF"
+
+        def __str__(self):
+            return self.value
 
     def correct_column_offsets(image, thresholdmin=0, thresholdmax=30, binning=1):
         pixperchannel = int(128 / binning)
@@ -284,6 +250,36 @@ def main(opts):
         mask = np.hypot(xx,yy)<radiuspx
         return mask
 
+
+
+    parser = argparse.ArgumentParser(description='Process .tvips recorder format')
+
+    parser.add_argument('--otype', type=OutputTypes, choices=list(OutputTypes), help='Output format')
+    parser.add_argument("--numframes", type=int, default=None, help="Limit data to the first n frames")
+    parser.add_argument("--binning", type=int, default=None, help="Bin data")
+
+    parser.add_argument("--dumpheaders", action="store_true", default=False, help="Dump headers")
+
+    parser.add_argument('--depth', choices=("uint8", "uint16", "int16"), default=None)
+    parser.add_argument('--linscale', help="Scale 16 bit data linear to 8 bit using the given range. Eg. 100-1000. Default: min, max", default=None)
+    parser.add_argument('--coffset', action='store_true', default=False)
+
+    #Virtual BF/blo options
+    parser.add_argument('--vbfcenter', default='0.0x0.0', help='Offset to center of Zero Order Beam')
+    parser.add_argument('--vbfradius', default=10.0, type=float, help='Integration disk radius')
+    parser.add_argument('--dimension', help='Output dimensions, default: sqrt(#images)^2')
+    parser.add_argument('--rotator', action="store_true", help="Pick only valid rotator frames")
+    parser.add_argument('--hysteresis', default=0, type=int, help='Move every second row by n pixel')
+    parser.add_argument('--postmag', default=1.0, type=float, help="Apply a mag correction")
+
+    parser.add_argument('--skip', default=0, type=int, help='Skip # images at the beginning')
+    parser.add_argument('--truncate', default=0, type=int, help='Truncate # images at the end')
+
+    parser.add_argument('input', help="Input filename, must be _000.tvips")
+    parser.add_argument('output', help="Output dir or output filename")
+
+    opts = parser.parse_args()
+
     def determine_recorder_image_dimension():
         #image dimension
         xdim, ydim = 0, 0
@@ -301,45 +297,21 @@ def main(opts):
     #read in file
     assert (os.path.exists(opts.input))
 
-    #changed the order around on these functions and made them independent
+    scalefunc = None
 
-    func1 = lambda x: x
-    if opts.cutoff is not None: #cut off too large intensities
-        func1 = lambda x: np.where(x>opts.cutoff, 0, x)
-        #x = np.where(x>opts.cutoff, 0, x)
+    if opts.linscale is not None or opts.binning is not None:
+        binfunc = lambda x: x
+        if opts.binning:
+            logging.info("Binning data by {:d}".format(opts.binning))
+            binfunc = lambda x: bin2(x, opts.binning)
 
-    func2 = lambda x: x
-    if opts.median_kernel is not None:
-        func2 = lambda x: medfilter(x, opts.median_kernel)
-        #x = medfilter(x, opts.median_kernel)
-
-    func3 = lambda x: x
-    if opts.gaus_kernel is not None:
-        func3 = lambda x: gausfilter(x, opts.gaus_kernel, opts.gaus_sig)
-        #x = gausfilter(x, opts.gaus_kernel, opts.gaus_sig)
-
-    # if opts.use_cnn:
-    #     x = cnnfilter(x)
-        #x = scale16to8(x, min, max)
-        #scalefunc = lambda x: scale16to8(x, min, max)
-        #logging.info("Mapping range of {}-{} to 0-255".format(min, max))
-
-    func4 = lambda x: x
-    if opts.binning is not None:
-        #logging.info("Binning data by {:d}".format(opts.binning))
-        #binfunc = lambda x: bin2(x, opts.binning)
-        func4 = lambda x: bin2(x, opts.binning)
-        #x = bin2(x, opts.binning)
-
-    func5 = lambda x: x
-    if opts.linscale is not None:
-        min, max = map(float, opts.linscale.split('-'))
-        func5 = lambda x: scale16to8(x, min, max)
-
-    filterfunc = lambda x :  func5(func2(func3(func4(func1(x)))))#x is the frame
+        if opts.linscale:
+            min, max = map(float, opts.linscale.split('-'))
+            scalefunc = lambda x: scale16to8(binfunc(x), min, max)
+            logging.info("Mapping range of {}-{} to 0-255".format(min, max))
 
     #read tvips file
-    rec = Recorder(opts.input, filterfunc = filterfunc, numframes=opts.numframes)
+    rec = Recorder(opts.input, scalefunc=scalefunc, numframes=opts.numframes)
 
     #truncate frames
     if (opts.skip != 0 and opts.truncate != 0):
@@ -413,23 +385,17 @@ def main(opts):
         #rec.frames = np.asarray(rec.frames)
         #rec.frameHeader = np.asarray(rec.frameHeader)
 
-    # if (opts.coffset is not None):
-    #     rec.frames = map(correct_column_offsets, rec.frames)
+    if (opts.coffset):
+        rec.frames = map(correct_column_offsets, rec.frames)
 
     if (opts.depth is not None):
         dtype = np.dtype(opts.depth) #parse dtype
         logging.debug("Mapping data to {}...".format(opts.depth))
         #rec.frames = list(map(lambda x: x.astype(dtype), rec.frames))
-        #logging.debug("Before: The minimum pixel value is {}, the maximum is {}".format(np.min(rec.frames[0]), np.max(rec.frames[0])))
-        rec.frames = rec.frames.astype(dtype)
-        #logging.debug("After: The minimum pixel value is {}, the maximum is {}".format(np.min(rec.frames[0]), np.max(rec.frames[0])))
+        rec.frames = [x.astype(dtype) for x in rec.frames]
         logging.debug("Done Mapping")
 
-    # logging.debug("Saving to type {}".format(opts.otype))
-    # logging.debug("Should be {}".format(OutputTypes.TiffStack))
-    # logging.debug("They are equal {}".format(str(OutputTypes.TiffStack)==opts.otype))
-
-    if (opts.otype == str(OutputTypes.IndividualTiff)):
+    if (opts.otype == OutputTypes.IndividualTiff):
             numframes = len(rec.frames)
             amount_of_digits = len(str(numframes-1))
 
@@ -437,22 +403,15 @@ def main(opts):
             if not os.path.exists(opts.output):
                 os.mkdir(opts.output)
 
-            filename = "{}_{:0" + str(amount_of_digits) + "d}.tif"
+            filename = "frame_{:0" + str(amount_of_digits) + "d}.tif"
             filename = os.path.join(opts.output, filename)
 
             for i, frame in enumerate(rec.frames):
-                logging.info("Writing file {}".format(i))
-                tifffile.imsave(filename.format(opts.fprefix, i), frame)
-                logging.info("Finished writing file {}".format(i))
-
-    elif (opts.otype == str(OutputTypes.TiffStack)):
+                tifffile.imsave(filename.format(i), frame)
+    elif (opts.otype == OutputTypes.TiffStack):
         tifffile.imsave(opts.output, rec.toarray())
 
-    elif (opts.otype == str(OutputTypes.TestFile)):
-        tifffile.imsave(opts.output, rec.frames[0])
-        logging.info("Wrote the test file")
-
-    elif (opts.otype == str(OutputTypes.VirtualBF)):
+    elif (opts.otype == OutputTypes.VirtualBF):
         xdim, ydim = determine_recorder_image_dimension()
         oimage = np.zeros((xdim*ydim), dtype=rec.frames[0].dtype)
 
@@ -481,15 +440,14 @@ def main(opts):
         logging.info("Writing out image")
         tifffile.imsave(opts.output, oimage)
 
-    elif (opts.otype == str(OutputTypes.Blockfile) or opts.otype == OutputTypes.Blockfile):
+    elif (opts.otype == OutputTypes.Blockfile):
         from . import blockfile
         xdim, ydim = determine_recorder_image_dimension()
 
         gc.collect()
         arr = rec.frames
 
-        logging.debug("The frames are: {}".format(type(arr)))
-        logging.debug("The x and ydim: {}x{}".format(xdim, ydim))
+
         if (len(arr) != xdim * ydim):
 
             #extend it to the requested dimensions
@@ -529,147 +487,9 @@ def main(opts):
                 Beam_energy=rec.general['ht']*1000,
                 Distortion_N01=1.0, Distortion_N09=1.0,
                 Note="Cheers from TVIPS!")
-        logging.debug("Finished writing the blo file")
     else:
         raise ValueError("No output type specified (--otype)")
 
 
-def mainCLI():
-    parser = argparse.ArgumentParser(description='Process .tvips recorder format')
-
-    parser.add_argument('--otype', type=OutputTypes, choices=list(OutputTypes), help='Output format')
-    parser.add_argument("--numframes", type=int, default=None, help="Limit data to the first n frames")
-    parser.add_argument("--binning", type=int, default=None, help="Bin data")
-
-    parser.add_argument("--dumpheaders", action="store_true", default=False, help="Dump headers")
-
-    parser.add_argument('--depth', choices=("uint8", "uint16", "int16"), default=None)
-    parser.add_argument('--linscale', help="Scale 16 bit data linear to 8 bit using the given range. Eg. 100-1000. Default: min, max", default=None)
-    parser.add_argument('--coffset', action='store_true', default=False)
-
-    #Virtual BF/blo options
-    parser.add_argument('--vbfcenter', default='0.0x0.0', help='Offset to center of Zero Order Beam')
-    parser.add_argument('--vbfradius', default=10.0, type=float, help='Integration disk radius')
-    parser.add_argument('--dimension', help='Output dimensions, default: sqrt(#images)^2')
-    parser.add_argument('--rotator', action="store_true", help="Pick only valid rotator frames")
-    parser.add_argument('--hysteresis', default=0, type=int, help='Move every second row by n pixel')
-    parser.add_argument('--postmag', default=1.0, type=float, help="Apply a mag correction")
-
-    parser.add_argument('--skip', default=0, type=int, help='Skip # images at the beginning')
-    parser.add_argument('--truncate', default=0, type=int, help='Truncate # images at the end')
-    #self added
-    parser.add_argument('--fprefix', default=None, help='Output Image/file name')
-    parser.add_argument('--cutoff', default=None, type = int, help='intensity cut off set to 0')
-    parser.add_argument('--median_kernel', default=None, type = int, help='median kernel size')
-    parser.add_argument('--gaus_kernel', default=None, type = int, help='gausian kernel size')
-    parser.add_argument('--gaus_sig', default=None, type = int, help='gaus filter sigma')
-
-
-    parser.add_argument('input', help="Input filename, must be _000.tvips")
-    parser.add_argument('output', help="Output dir or output filename")
-
-    opts = parser.parse_args()
-
-    main(opts)
-
-
-def mainUI(**k):
-    ks = SimpleNamespace(**k)
-    d = {}
-    if ks.oupt==".blo":
-        d["otype"]="blo"
-        d["output"]= ks.oup+"/{}.blo".format(ks.pref)
-    if ks.oupt=="list of .tiff":
-        d["otype"]="Individual"
-        d["output"]= ks.oup
-        d["fprefix"]= ks.pref
-    d["numframes"]=None
-    if ks.use_bin==2:
-        d["binning"]=ks.bin_fac
-    else:
-        d["binning"]=None
-    d["depth"]=ks.dep
-    if ks.use_scaling==2:
-        d["linscale"]="{}-{}".format(ks.scalemin, ks.scalemax)
-    else:
-        d["linscale"]=None
-    d["dimension"]="{}x{}".format(ks.sdx, ks.sdy)
-    d["rotator"]= (ks.use_rotator==2)
-    d["dumpheaders"]=False
-    d["coffset"]=False
-    d["postmag"]=1.0
-    if ks.use_hyst==2:
-        d["hysteresis"]= ks.hyst_val
-    else:
-        d["hysteresis"]= 0
-    d["skip"]=ks.skip
-    d["truncate"]=ks.trunc
-    d["input"]= ks.inp
-    #self created args
-    if ks.useintcut==2:
-        d["cutoff"]=ks.intcut
-    else:
-        d["cutoff"]=None
-    if ks.use_med==2:
-        d["median_kernel"]=ks.med_ks
-    else:
-        d["median_kernel"]=None
-    if ks.use_gauss==2:
-        d["gaus_kernel"]=ks.gauss_ks
-        d["gaus_sig"]=ks.gauss_sig
-    else:
-        d["gaus_kernel"]=None
-        d["gaus_sig"]=None
-    opts = SimpleNamespace(**d)
-    main(opts)
-
-
-def createOneImageUI(**k):
-    #create the args
-    ks = SimpleNamespace(**k)
-    d = {}
-    d["otype"]="TestFile"
-    d["numframes"]=1
-    if ks.use_bin==2:
-        d["binning"]=ks.bin_fac
-    else:
-        d["binning"]=None
-    d["depth"]=ks.dep
-    if ks.use_scaling==2:
-        d["linscale"]="{}-{}".format(ks.scalemin, ks.scalemax)
-    else:
-        d["linscale"]=None
-    d["dimension"]="{}x{}".format(ks.sdx, ks.sdy)
-    d["rotator"]= False #(ks.use_rotator==2)
-    d["dumpheaders"]=False
-    d["coffset"]=False
-    # if ks.use_hyst==2:
-    #     d["hysteresis"]= ks.hyst_val
-    # else:
-    #     d["hysteresis"]= 0
-    d["hysteresis"]= 0
-    d["skip"]=0#ks.skip
-    d["truncate"]=0#ks.trunc
-    d["input"]= ks.inp
-    d["output"]= "./temp.tiff"
-    #self created args
-    if ks.useintcut==2:
-        d["cutoff"]=ks.intcut
-    else:
-        d["cutoff"]=None
-    if ks.use_med==2:
-        d["median_kernel"]=ks.med_ks
-    else:
-        d["median_kernel"]=None
-    if ks.use_gauss==2:
-        d["gaus_kernel"]=ks.gauss_ks
-        d["gaus_sig"]=ks.gauss_sig
-    else:
-        d["gaus_kernel"]=None
-        d["gaus_sig"]=None
-    opts = SimpleNamespace(**d)
-    main(opts)
-
-
 if __name__ == "__main__":
-    mainCLI()
+    main()

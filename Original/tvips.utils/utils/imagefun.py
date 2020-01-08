@@ -97,23 +97,21 @@ def bin2(a, factor):
     #binned = imresize(a, (a.shape[0]//factor, a.shape[1]//factor))
     binned = np.array(Image.fromarray(a).resize(
         size =(a.shape[0]//factor, a.shape[1]//factor)))
-        #,resample = Image.BILINEAR )
     return binned
 
-
 # def bin2(a, factor):
-    # '''
-    # This is based on: http://scipy.org/Cookbook/Rebinning
-    # It is simplified to the case of a 2D array with the same
-    # binning factor in both dimensions.
-    # '''
-    # assert len(a.shape) == 2
-    # oldshape = a.shape
-    # newshape = int(a.shape[0]/factor), int(a.shape[1]/factor)
-    # tmpshape = (newshape[0], factor, newshape[1], factor)
-    # f = factor * factor
-    # binned = np.sum(np.sum(np.reshape(a, tmpshape), 1), 2) / f
-    # return binned
+#     '''
+#     This is based on: http://scipy.org/Cookbook/Rebinning
+#     It is simplified to the case of a 2D array with the same
+#     binning factor in both dimensions.
+#     '''
+#     assert len(a.shape) == 2
+#     oldshape = a.shape
+#     newshape = int(a.shape[0]/factor), int(a.shape[1]/factor)
+#     tmpshape = (newshape[0], factor, newshape[1], factor)
+#     f = factor * factor
+#     binned = np.sum(np.sum(np.reshape(a, tmpshape), 1), 2) / f
+#     return binned
 
 #def bin2m(a, factor):
 #       '''

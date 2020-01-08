@@ -80,7 +80,7 @@ def main():
     parser.add_option("--mirrory",
                   action="store_true", dest="mirrory", default=False,
                   help="Mirror Y Axis")
-    parser.add_option("--notinplace", action="store_false", dest="inplace", default=True,
+    parser.add_option("--notinplace", action="store_false", dest="inplace", default=True, 
                       help="Manipulate images in place")
 
     (options, args) = parser.parse_args()

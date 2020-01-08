@@ -145,13 +145,17 @@ class ConnectedWidget(rawgui):
         if condition:
             self.statusedit.setText("Status: Busy ...")
             self.hardRepaint()
-            try:
-                recorder.mainUI(**self.uivalues)
-                self.statusedit.setText("Status: Done converting file.")
-                self.hardRepaint()
-            except:
-                self.statusedit.setText("Status: An error occured while converting. Double-check setting!")
-                self.hardRepaint()
+
+            recorder.mainUI(**self.uivalues)
+            self.statusedit.setText("Status: Done converting file.")
+            self.hardRepaint()
+            # try:
+            #     recorder.mainUI(**self.uivalues)
+            #     self.statusedit.setText("Status: Done converting file.")
+            #     self.hardRepaint()
+            # except:
+            #     self.statusedit.setText("Status: An error occured while converting. Double-check setting!")
+            #     self.hardRepaint()
                 # b= QErrorMessage()
                 # b.showMessage("Invalid arguments! Check file path.")
                 # b.exec_()
@@ -224,11 +228,11 @@ def mainDebug():
     #set the values
     form.lineEdit.setText("./Dummy/rec_20190412_183600_000.tvips")
     form.spinBox.setValue(150)
-    form.spinBox_2.setValue(150)
-    form.lineEdit_2.setText("/Users/nielscautaerts/Desktop/Temp")
+    form.spinBox_2.setValue(1)
+    form.lineEdit_2.setText("./Dummy")
     form.lineEdit_3.setText("testpref")
     form.comboBox.setCurrentIndex(1)
     app.exec_()
 
 if __name__ == "__main__":
-    main()
+    mainDebug()
