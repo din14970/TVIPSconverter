@@ -17,7 +17,6 @@
 # along with  HyperSpy.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-#from traits.api import Undefined
 import numpy as np
 import logging
 import warnings
@@ -28,11 +27,8 @@ from dateutil import tz, parser
 
 from . import imagefun
 
-import datetime
-#from hyperspy.misc.array_tools import sarray2dict, dict2sarray
-#from hyperspy.misc.date_time_tools import serial_date_to_ISO_format, datetime_to_serial_date
-
 from collections import OrderedDict
+
 
 def sarray2dict(sarray, dictionary=None):
     """Converts a struct array to an ordered dictionary
@@ -86,6 +82,7 @@ def dict2sarray(dictionary, sarray=None, dtype=None):
             sarray[name] = dictionary[name]
     return sarray
 
+
 def ISO_format_to_serial_date(date, time, timezone='UTC'):
     """ Convert ISO format to a serial date. """
     if timezone is None or timezone == 'Coordinated Universal Time':
@@ -122,8 +119,8 @@ def serial_date_to_ISO_format(serial):
     """
     dt_utc = serial_date_to_datetime(serial)
     dt_local = dt_utc.astimezone(tz.tzlocal())
-    return dt_local.date().isoformat(), dt_local.time().isoformat(), dt_local.tzname()
-
+    return (dt_local.date().isoformat(), dt_local.time().isoformat(),
+            dt_local.tzname())
 
 
 _logger = logging.getLogger(__name__)
@@ -193,8 +190,6 @@ def get_default_header(endianess='<'):
     header['UNKNOWN1'][0] = 131141          # Very typical value (always?)
     header['Acquisition_time'][0] = datetime_to_serial_date(
         datetime.datetime.fromtimestamp(86400, dateutil.tz.tzutc()))
-    # Default to UNIX epoch + 1 day
-    # Have to add 1 day, as dateutil's timezones dont work before epoch
     return header
 
 
@@ -237,16 +232,15 @@ def get_header_from_signal(signal, endianess='<'):
         'Data_offset_2': offset2,
     }
 
-    header_sofar.update(kwargs)
-
     header = dict2sarray(header_sofar, sarray=header)
     return header, note
+
 
 def get_header(data_shape, scan_scale, diff_scale, endianess="<", **kwargs):
     header = get_default_header(endianess)
     note = ''
     if len(data_shape) == 4:
-        NX, NY = data_shape[:2][::-1] #first dimension seems to by y in np
+        NX, NY = data_shape[:2][::-1]  # first dimension seems to by y in np
         SX = scan_scale
         SY = scan_scale
     elif len(data_shape) == 3:
@@ -256,7 +250,6 @@ def get_header(data_shape, scan_scale, diff_scale, endianess="<", **kwargs):
         SY = SX
     elif len(data_shape) == 2:
         NX = NY = SX = SY = 1
-
     else:
         raise ValueError("Invalid data shape")
 
@@ -285,7 +278,6 @@ def get_header(data_shape, scan_scale, diff_scale, endianess="<", **kwargs):
     return header, note
 
 
-
 def file_reader(filename, endianess='<', mmap_mode=None,
                 lazy=False, **kwds):
     _logger.debug("Reading blockfile: %s" % filename)
@@ -312,7 +304,7 @@ def file_reader(filename, endianess='<', mmap_mode=None,
     # It seems it uses "\x00" for padding, so we remove it
     try:
         header['Note'] = note.decode("latin1").strip("\x00")
-    except:
+    except Exception:
         # Not sure about the encoding so, if it fails, we carry on
         _logger.warn(
             "Reading the Note metadata of this file failed. "
@@ -334,7 +326,7 @@ def file_reader(filename, endianess='<', mmap_mode=None,
     offset1 = header['Data_offset_1']
     f.seek(offset1)
     data_pre = np.fromfile(f, count=NX*NY, dtype=endianess+'u1'
-        ).squeeze().reshape((NY, NX), order='C')
+                           ).squeeze().reshape((NY, NX), order='C')
 
     # Then comes actual blockfile
     offset2 = header['Data_offset_2']
@@ -386,7 +378,7 @@ def file_reader(filename, endianess='<', mmap_mode=None,
         for i in range(dim)]
 
     dictionary = {'data': data,
-                  'vbf' : data_pre,
+                  'vbf': data_pre,
                   'axes': axes,
                   'metadata': metadata,
                   'original_metadata': original_metadata,
@@ -394,6 +386,7 @@ def file_reader(filename, endianess='<', mmap_mode=None,
 
     f.close()
     return [dictionary, ]
+
 
 def file_writer(filename, signal, **kwds):
     endianess = kwds.pop('endianess', '<')
@@ -438,7 +431,8 @@ def file_writer(filename, signal, **kwds):
 
 def file_writer_array(filename, array, scan_scale, diff_scale, **kwds):
     endianess = "<"
-    header, note = get_header(array.shape, scan_scale, diff_scale, endianess, **kwds)
+    header, note = get_header(array.shape, scan_scale, diff_scale, endianess,
+                              **kwds)
 
     with open(filename, 'wb') as f:
         # Write header
@@ -451,29 +445,28 @@ def file_writer_array(filename, array, scan_scale, diff_scale, **kwds):
         zero_pad = int(header['Data_offset_1']) - f.tell()
         np.zeros((zero_pad,), np.byte).tofile(f)
         # Write virtual bright field
-        vbf=None
+        vbf = None
 
         if len(array.shape) == 4:
-            amean = (2,3)
-            #do proper vbf
-
+            amean = (2, 3)
+            # do proper vbf
             xx, yy = np.meshgrid(range(array.shape[2]), range(array.shape[3]))
-            mask = np.hypot(xx - 0.5 * array.shape[2], yy - 0.5 * array.shape[3]) < 5 #TODO: make radius and offset configurable
+            mask = np.hypot(xx - 0.5 * array.shape[2],
+                            yy - 0.5 * array.shape[3]) < 5
+            # TODO: make radius and offset configurable
 
             vbffloat = np.zeros((array.shape[:2]))
             for i in range(array.shape[0]):
                 for j in range(array.shape[1]):
-                    vbffloat[i,j] = array[i,j][mask].sum()
+                    vbffloat[i, j] = array[i, j][mask].sum()
 
-            #scale to 8 bit
+            # scale to 8 bit
             vbf = imagefun.scalestd(vbffloat).astype(endianess + "u1")
 
         elif len(array.shape) == 3:
-            amean = (1,2)
+            amean = (1, 2)
 
-            vbf = array.mean(axis=amean).astype(
-            endianess +
-            'u1')
+            vbf = array.mean(axis=amean).astype(endianess + 'u1')
         vbf.tofile(f)
         # Zero pad until next data block
         if f.tell() > int(header['Data_offset_2']):
@@ -488,7 +481,8 @@ def file_writer_array(filename, array, scan_scale, diff_scale, **kwds):
                                         ('ID', endianess + 'u4')])
         dp_head['MAGIC'] = 0x55AA
         # Write by loop:
-        for img in array.reshape(array.shape[0]*array.shape[1], *array.shape[2:]):
+        for img in array.reshape(array.shape[0]*array.shape[1],
+                                 *array.shape[2:]):
             dp_head.tofile(f)
             img.astype(endianess + 'u1').tofile(f)
             dp_head['ID'] += 1

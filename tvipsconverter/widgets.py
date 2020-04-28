@@ -42,7 +42,6 @@ class ConnectedWidget(rawgui):
         self.checkBox_6.stateChanged.connect(self.updateActive)
         self.updateActive()
 
-
     def updateActive(self):
         if self.checkBox_8.checkState() == 2:
             self.spinBox_11.setEnabled(True)

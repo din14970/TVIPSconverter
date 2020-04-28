@@ -1,3 +1,7 @@
+"""
+Converts the TVIPS to a blo file from the command line
+"""
+
 import re
 import sys
 
