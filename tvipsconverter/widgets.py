@@ -79,7 +79,7 @@ class ConnectedWidget(rawgui):
             self.spinBox_9.setEnabled(False)
 
     def openFileBrowser(self, le, fs):
-        path, okpres = QFileDialog.getOpenFileName(caption = "Select file", filter = fs)
+        path, okpres = QFileDialog.getSaveFileName(caption = "Select file", filter = fs)
         if okpres:
             le.setText(path)
 
