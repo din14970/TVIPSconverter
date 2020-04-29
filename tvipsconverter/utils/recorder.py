@@ -6,6 +6,8 @@ import gc
 import argparse
 import tifffile
 from types import SimpleNamespace
+import h5py
+from pathlib import Path
 
 from enum import Enum
 
@@ -15,32 +17,32 @@ from .imagefun import (scale16to8, bin2, gausfilter,
 
 # Initialize the Logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
 
 TVIPS_RECORDER_GENERAL_HEADER = [
-    ('size', 'u4'),
+    ('size', 'u4'),  # unused - likely the size of generalheader in bytes
     ('version', 'u4'),  # 1 or 2
-    ('dimx', 'u4'),
-    ('dimy', 'u4'),
+    ('dimx', 'u4'),  # dp image size width
+    ('dimy', 'u4'),  # dp image size height
     ('bitsperpixel', 'u4'),  # 8 or 16
-    ('offsetx', 'u4'),
+    ('offsetx', 'u4'),  # generally 0
     ('offsety', 'u4'),
-    ('binx', 'u4'),
+    ('binx', 'u4'),  # camera binning
     ('biny', 'u4'),
     ('pixelsize', 'u4'),  # nm, physical pixel size
-    ('ht', 'u4'),
-    ('magtotal', 'u4'),
-    ('frameheaderbytes', 'u4'),
-    ('dummy', 'S204'),
+    ('ht', 'u4'),  # high tension, voltage
+    ('magtotal', 'u4'),  # magnification/camera length?
+    ('frameheaderbytes', 'u4'),  # number of bytes per frame header
+    ('dummy', 'S204'),  # just writes out TVIPS TVIPS TVIPS
     ]
 
 TVIPS_RECORDER_FRAME_HEADER = [
-    ('num', 'u4'),
+    ('num', 'u4'),  # seems to cycle also
     ('timestamp', 'u4'),  # seconds since 1.1.1970
     ('ms', 'u4'),  # additional milliseconds to the timestamp
-    ('LUTidx', 'u4'),
-    ('fcurrent', 'f4'),
-    ('mag', 'u4'),
+    ('LUTidx', 'u4'),  # always the same value
+    ('fcurrent', 'f4'),  # 0 for all frames
+    ('mag', 'u4'),  # same for all frames
     ('mode', 'u4'),  # 1 -> image 2 -> diff
     ('stagex', 'f4'),
     ('stagey', 'f4'),
@@ -48,172 +50,250 @@ TVIPS_RECORDER_FRAME_HEADER = [
     ('stagea', 'f4'),
     ('stageb', 'f4'),
     ('rotidx', 'u4'),
-    ('temperature', 'f4'),
-    ('objective', 'f4'),
+    ('temperature', 'f4'),  # cycles between 0.0 and 9.0 with step 1.0
+    ('objective', 'f4'),  # kind of randomly between 0.0 and 1.0
     # for header version 2, some more data might be present
     ]
 
 
 class Recorder(object):
 
-    def __init__(self, filename, filterfunc=None, numframes=None,
-                 framerecord=None):
-        assert os.path.exists(filename)
-        assert filename.endswith(".tvips")
-
+    def __init__(self, opts):
+        logger.debug("Initializing recorder object")
+        self.filename = opts.input  # first input file
+        assert os.path.exists(self.filename), "TVIPS file not found"
+        assert self.filename.endswith(".tvips"), "File is not a tvips file"
+        assert os.path.exists(opts.output), "Output folder doesn't exist"
+        self.total_size = self._get_total_scan_size()
+        # HDF5 object to write the raw data to
+        oupstr = str(Path(opts.output+"/stream.hdf5"))
+        self.stream = h5py.File(oupstr, "w")
+        # general is the top header
         self.general = None
         self.dtype = None
-        self.frameHeader = list()
-        self.frames = None
-        self.filterfunc = filterfunc
-        self.numframes = numframes
-
+        # to limit the number of frames read
+        self.numframes = opts.numframes
+        # keep a count of the number of files already read
+        self.already_read = 0
         self.frameshape = None
-        self.framerecord = framerecord
+        # basic image processing
+        try:
+            self.coffset = opts.coffset
+        except Exception as e:
+            logger.error(f"No parameters for coffset found, "
+                         f"setting to None. Error: {e}")
+            self.coffset = None
+        # make a VBF mask. For this we need a frame
+        self._read_first_frame()
+        # ZOB center offset
+        try:
+            zoboffset = list(map(float, opts.vbfcenter.split('x')))
+        except Exception as e:
+            logger.error(f"No valid offsets defined for VBF spot, "
+                         f"setting to zero. Error: {e}")
+            zoboffset = list(map(float, (0, 0)))
+        # generate mask
+        try:
+            radius = opts.vbfradius
+        except Exception as e:
+            logger.error(f"No valid radius defined for VBF spot, "
+                         f"setting to 10. Error: {e}")
+            radius = 10
+        self.mask = self._virtual_bf_mask(zoboffset, radius)
+        self.vbfs = []
+        # the start and stop frames
+        # for convenience we also store rotation
+        # indexes. For the end index we go backwards.
+        self.start = None
+        self.end = None
+        self.rotidxs = []
+        self._read_all_files()
+        self._find_start_and_stop()
+        self.stream.close()
 
-        # find numerical prefix
-        part = int(filename[-9:-6])
+    def _read_first_frame(self):
+        part = int(self.filename[-9:-6])
         if part != 0:
             raise ValueError("Can only read video sequences starting with "
                              "part 000")
+        with open(self.filename, "rb") as f:
+            fh = FileHandle(file=f)
+            fh.seek(0)
+            # skip general header from first file
+            self._readGeneral(fh)
+            # read first frame
+            fh.read_record(self.frame_header)
+            skip = self.inc - self.dt.itemsize
+            fh.seek(skip, 1)
+            # read frame
+            frame = np.fromfile(
+                        fh,
+                        count=self.general.dimx*self.general.dimy,
+                        dtype=self.dtype
+                        )  # dtype=self.dtype,
+            frame.shape = (self.general.dimx, self.general.dimy)
+            self.firstframe = frame
+        logger.debug("Read and stored the first frame")
 
-        # read only the first self.numframes from the first data
+    def _get_total_scan_size(self):
+        """
+        Get the total file size of the entire stream for tracking
+        the progress
+        """
+        def get_filesize(fn):
+            with open(fn, "rb") as f:
+                fh = FileHandle(file=f)
+                return fh.size
+        sizes = self._scan_over_all_files(get_filesize)
+        return sum(sizes)
+
+    def _frames_exceeded(self):
+        """Have we read the number of frames?"""
         if self.numframes is not None:
-            fn = filename[:-9]+"{:03d}.tvips".format(0)
-            # logger.info("Opening file")
-            frames, headers = self._readIndividualFile(fn, part)
-            # logger.info("Succes reading frames from file")
-            # merge memory efficient
-            self.frames = np.asarray(frames)
-            self.frameHeader.extend(headers)
+            if self.already_read >= self.numframes:
+                logger.debug(f"{self.already_read} frames have been read. "
+                             f"Quitting.")
+                return True
+        return False
 
+    def _scan_over_all_files(self, func, *args, **kwargs):
+        """Scan over all TVIPS file and perform a function on each.
+        If the function returns something this returns the total."""
+        results = []
+        part = int(self.filename[-9:-6])
+        if part != 0:
+            raise ValueError("Can only read video sequences starting with "
+                             "part 000")
+        try:
+            while True:
+                fn = self.filename[:-9]+"{:03d}.tvips".format(part)
+                if not os.path.exists(fn):
+                    logger.debug(f"There is no file {fn}; breaking loop")
+                    break
+                logger.debug(f"Opening file {fn}")
+                results.append(func(fn, *args, **kwargs))
+                logger.debug(f"Finished reading file {fn}")
+                part += 1
+        except StopIteration:
+            pass
+        return results
+
+    def _read_all_files(self):
+        """Read in all data from all files and convert to hdf5"""
+        # general info should already have been read by image 1
+        # put header as a group into HDF5 group
+        grp = self.stream.create_group("ImageStream")
+        # add the header to attributes
+        for i in TVIPS_RECORDER_GENERAL_HEADER:
+            grp.attrs[i[0]] = self.general[i[0]]
+        self._scan_over_all_files(self._readIndividualFile)
+
+    def _readGeneral(self, fh):
+        """Read the main header from the first file"""
+        self.general = fh.read_record(TVIPS_RECORDER_GENERAL_HEADER)
+        # changed np.uint16 to np.int16
+        self.dtype = np.uint8 if self.general.bitsperpixel == 8 else np.uint16
+        self.frameshape = (self.general.dimx, self.general.dimy)
+        # set a few options for frame headers
+        if self.general.version == 1:
+            self.inc = 12
+            self.frame_header = TVIPS_RECORDER_FRAME_HEADER
+        elif self.general.version == 2:
+            self.inc = self.general.frameheaderbytes
+            self.frame_header = TVIPS_RECORDER_FRAME_HEADER
         else:
-            try:
-                while True:
-                    fn = filename[:-9]+"{:03d}.tvips".format(part)
+            raise NotImplementedError(f"Version {self.general.version} not "
+                                      f"yet supported.")
+        self.dt = np.dtype(self.frame_header)
+        # make sure the record consumes less bytes than reported in the main
+        # header
+        assert self.inc >= self.dt.itemsize, ("The record consumes more bytes "
+                                              "than stated in the main header")
 
-                    if not os.path.exists(fn):
-                        break
-
-                    # logger.info("Opening file")
-                    frames, headers = self._readIndividualFile(fn, part)
-                    # logger.info("Succes reading frames from file")
-                    # merge memory efficient
-                    if (part == 0):
-                        self.frames = np.asarray(frames)
-                    else:
-                        self.frames = np.append(self.frames, frames, axis=0)
-
-                    self.frameHeader.extend(headers)
-                    part += 1
-                    # logger.info("End of file loop")
-                # logger.info("Finished reading file")
-            except StopIteration:
-                pass
-        logger.debug("Type of self.frames: {}".format(type(self.frames)))
-        print("Read {} frame(s) successfully".format(len(self.frames)))
-
-    def _readIndividualFile(self, fn, part):
+    def _readIndividualFile(self, fn):
+        """
+        Extract the frames from the file and put into hdf5 file
+        """
         logger.info("Reading {}".format(fn))
-
-        frames = list()
-        frame_headers = list()
-
+        part = int(fn[-9:-6])
         with open(fn, "rb") as f:
             fh = FileHandle(file=f)
             fh.seek(0)
             # read general header from first file
             if part == 0:
                 self._readGeneral(fh)
-            # respect desire not to read everything
-            if self.numframes is not None:
-                logger.debug("We use {} numframes".format(self.numframes))
-                for j in range(self.numframes):
-                    # actually add to frames
-                    frame, header = self._readFrame(fh)
-                    frames.append(frame)
-                    frame_headers.append(header)
-                return frames, frame_headers
-                raise StopIteration()  # to stop loop over files also
-            else:
-                # read all frames
-                while fh.tell() < fh.size:
-                    frame, header = self._readFrame(fh)
-
-                    frames.append(frame)
-                    frame_headers.append(header)
-
-        return frames, frame_headers
-
-    def _readGeneral(self, fh):
-        self.general = fh.read_record(TVIPS_RECORDER_GENERAL_HEADER)
-        # changed np.uint16 to np.int16
-        self.dtype = np.uint8 if self.general.bitsperpixel == 8 else np.uint16
-        self.frameshape = (self.general.dimx, self.general.dimy)
+            # read frames
+            while fh.tell() < fh.size:
+                self._readFrame(fh)
+                self.already_read += 1  # increment number of frames
+                if self._frames_exceeded():
+                    raise StopIteration
 
     def _readFrame(self, fh, record=None):
-        if self.general.version == 1:
-            inc = 12
-            record = TVIPS_RECORDER_FRAME_HEADER
-        else:
-            inc = self.general.frameheaderbytes
-
-        if record is None:
-            record = TVIPS_RECORDER_FRAME_HEADER
-            if inc > 12:
-                pass
-
-        dt = np.dtype(record)
-        # make sure the record consumes less bytes than reported in the main
-        # header
-        assert inc >= dt.itemsize
-        # read header
-        header = fh.read_record(record)
-        logger.debug("Starting frame read (pos: {}): {}".format(fh.tell(),
-                                                                header))
-        skip = inc - dt.itemsize
+        # read frame header
+        header = fh.read_record(self.frame_header)
+        logger.debug(f"{self.already_read}: Starting frame read "
+                     f"(pos: {fh.tell()}). rot: {header['rotidx']}")
+        skip = self.inc - self.dt.itemsize
         fh.seek(skip, 1)
         # read frame
         frame = np.fromfile(
                     fh,
                     count=self.general.dimx*self.general.dimy,
-                    dtype=np.int16
+                    dtype=self.dtype
                     )  # dtype=self.dtype,
         frame.shape = (self.general.dimx, self.general.dimy)
-        # add line to make negative pixel values 0
-        # frame = np.where(frame>0, frame, 0)
-        # frame[frame<0] = 0
-        # frame.astype(self.dtype)
-        # logger.info("Did we edit this file?")
-        logger.debug("Starting filters")
+        # do some basic calculations on the frame
+        if (self.coffset is not None):
+            frame = self._correct_column_offsets(frame)
+        # put the frame in the hdf5 file under the group
+        g = self.stream["ImageStream"]
+        c = f"{self.already_read}".zfill(6)
+        ds = g.create_dataset(f"Frame_{c}", data=frame)
+        for i in self.frame_header:
+            ds.attrs[i[0]] = header[i[0]]
+        # store the rotation index for finding start and stop later
+        self.rotidxs.append(header['rotidx'])
+        # immediately calculate and store the VBF intensity
+        vbf_int = frame[self.mask].mean()
+        ds.attrs["VBF_intensity"] = vbf_int
+        self.vbfs.append(vbf_int)
 
-        if self.filterfunc is not None:
-            frame = self.filterfunc(frame).astype(np.uint8)
+    def _find_start_and_stop(self):
+        if self.rotidxs:
+            # find out if it's the first or last frame
+            previous = self.rotidxs[0]
+            for j, i in enumerate(self.rotidxs):
+                if i > previous:
+                    self.start = j-1
+                    logger.info(f"Found start at frame {j-1}")
+                    self.stream["ImageStream"].attrs[
+                        "start_frame"] = self.start
+                    break
+                previous = i
+            # loop over it backwards to find the end
+            previous = self.rotidxs[-1]
+            for j, i in reversed(list(enumerate(self.rotidxs))):
+                if i < previous:
+                    self.end = j+1
+                    logger.info(f"Found final at frame {j+1}")
+                    self.stream["ImageStream"].attrs[
+                        "start_frame"] = self.start
+                    break
+                previous = i
 
-        logger.debug("Finished filters")
-        return frame, header
+    def _virtual_bf_mask(self, centeroffsetpx=(0, 0), radiuspx=10):
+        """Create virtual bright field mask"""
+        arr = self.firstframe
+        xx, yy = np.meshgrid(np.arange(arr.shape[0], dtype=np.float),
+                             np.arange(arr.shape[1], dtype=np.float))
+        xx -= 0.5 * arr.shape[0] + centeroffsetpx[0]
+        yy -= 0.5 * arr.shape[1] + centeroffsetpx[1]
+        mask = np.hypot(xx, yy) < radiuspx
+        return mask
 
-    def toarray(self):
-        return np.asarray(self.frames)
-
-
-class OutputTypes(Enum):
-    IndividualTiff = "Individual"
-    TiffStack = "TiffStack"
-    TestFile = "TestFile"
-    Blockfile = "blo"
-    VirtualBF = "VirtualBF"
-
-    def __str__(self):
-        return self.value
-
-
-def main(opts):
-    """Main function that runs the transform depending on options"""
-    logger.debug(str(opts))
-
-    def correct_column_offsets(image, thresholdmin=0, thresholdmax=30,
-                               binning=1):
+    def _correct_column_offsets(image, thresholdmin=0, thresholdmax=30,
+                                binning=1):
         """Do some kind of intensity correction, unsure reason"""
         pixperchannel = int(128 / binning)
         # binning has to be an integer
@@ -235,16 +315,7 @@ def main(opts):
         offsets = np.array(offsets)
         return (imtemp - offsets[np.newaxis, :]).reshape(image.shape)
 
-    def virtual_bf_mask(image, centeroffsetpx=(0.0), radiuspx=10):
-        """Create virtual bright field mask"""
-        xx, yy = np.meshgrid(np.arange(image.shape[0], dtype=np.float),
-                             np.arange(image.shape[1], dtype=np.float))
-        xx -= 0.5 * image.shape[0] + centeroffsetpx[0]
-        yy -= 0.5 * image.shape[1] + centeroffsetpx[1]
-        mask = np.hypot(xx, yy) < radiuspx
-        return mask
-
-    def determine_recorder_image_dimension():
+    def determine_recorder_image_dimension(self):
         # scan dimensions
         xdim, ydim = 0, 0
         if (opts.dimension is not None):
@@ -257,6 +328,44 @@ def main(opts):
             xdim, ydim = dim, dim
             logger.debug("Image dimensions: {}x{}".format(xdim, ydim))
         return xdim, ydim
+
+    def make_virtual_bf(self):
+        xdim, ydim = determine_recorder_image_dimension(self)
+        oimage = np.zeros((xdim*ydim), dtype=rec.frames[0].dtype)
+        for i, frame in enumerate(rec.frames[:xdim*ydim]):
+            oimage[i] = frame[mask].mean()
+        oimage.shape = (xdim, ydim)
+        # correct for meander scanning of rotator
+        if (opts.rotator):
+            oimage[::2] = oimage[::2][:, ::-1]
+            # correct for hysteresis
+            if opts.hysteresis != 0:
+                logger.info("Correcting for hysteresis...")
+                oimage[::2] = np.roll(oimage[::2], opts.hysteresis, axis=1)
+                logger.info("Rescaling to valid area...")
+                oimage = oimage[:, opts.hysteresis:]
+        logger.info("Writing out image")
+        tifffile.imsave(opts.output, oimage)
+
+    def _update_gui_progess(self):
+        """If using the GUI update features with progress"""
+        pass
+
+
+class OutputTypes(Enum):
+    IndividualTiff = "Individual"
+    TiffStack = "TiffStack"
+    TestFile = "TestFile"
+    Blockfile = "blo"
+    VirtualBF = "VirtualBF"
+
+    def __str__(self):
+        return self.value
+
+
+def main(opts):
+    """Main function that runs the transform depending on options"""
+    logger.debug(str(opts))
 
     # read in file
     assert (os.path.exists(opts.input))
@@ -312,85 +421,13 @@ def main(opts):
 
     # read tvips file
     # default numframes is none
-    rec = Recorder(opts.input, filterfunc=filterfunc, numframes=opts.numframes)
-
-    # truncate frames
-    if (opts.skip != 0 and opts.truncate != 0):
-        rec.frames = rec.frames[opts.skip:-opts.truncate]
-        rec.frameHeader = rec.frameHeader[opts.skip:-opts.truncate]
-    elif (opts.skip != 0 and opts.truncate == 0):
-        rec.frames = rec.frames[opts.skip:]
-        rec.frameHeader = rec.frameHeader[opts.skip:]
-    elif (opts.skip == 0 and opts.truncate != 0):
-        rec.frames = rec.frames[:-opts.truncate]
-        rec.frameHeader = rec.frameHeader[:-opts.truncate]
-    else:
-        pass  # nothing requested
-
-    if (opts.dumpheaders):
-        print("General:\n{}\nFrame:\n{}".format(rec.general, rec.frameHeader))
-
-    if (opts.rotator):
-        previous = 0x43  # some unlikely initial value
-        start = None
-        end = None
-        i = 0
-        numframes = None
-        if opts.dimension is not None:
-            xdim, ydim = list(map(int, opts.dimension.split('x')))
-            numframes = xdim*ydim
-        for i, fh in enumerate(rec.frameHeader):
-            logger.debug("Frame: {:05d} Index: {:05d}".format(i, fh['rotidx']))
-            if start is None and end is None:
-                # set start idx
-                if fh['rotidx'] == previous + 1:  # first consecutive frame idx
-                    start = i - 1  # TODO: check for > 0
-                    logger.info("Found start at {}".format(start))
-                    continue
-
-            if start is not None:
-                if numframes is None:
-                    # find end idx
-                    if fh['rotidx'] == previous:
-                        break
-
-                else:
-                    logger.info("Taking {} frames based on given "
-                                "dimensions".format(numframes))
-                    # manipulate i, not end as it will be assigned outside loop
-                    i = start + numframes
-                    logger.debug("Start: {:05d} End: {:05d}".format(start, i))
-                    if (len(rec.frameHeader) <= i):
-                        logger.error("Too few records in dataset for the "
-                                     "given dimensions")
-                    break
-            previous = fh['rotidx']
-        end = i
-        logger.info("Found end at {}".format(end))
-        # remove uninteresting data
-        rec.frames = rec.frames[start:end]
-        rec.frameHeader = rec.frameHeader[start:end]
-        logger.info("Found {} frames in set".format(len(rec.frames)))
-        # rec.frames = np.asarray(rec.frames)
-        # rec.frameHeader = np.asarray(rec.frameHeader)
-    if (opts.coffset is not None):
-        rec.frames = map(correct_column_offsets, rec.frames)
+    rec = Recorder(opts)
 
     if (opts.depth is not None):
         dtype = np.dtype(opts.depth)  # parse dtype
         logger.debug("Mapping data to {}...".format(opts.depth))
-        # rec.frames = list(map(lambda x: x.astype(dtype), rec.frames))
-        # logger.debug("Before: The minimum pixel value is {}, the maximum is
-        # {}".format(np.min(rec.frames[0]), np.max(rec.frames[0])))
         rec.frames = rec.frames.astype(dtype)
-        # logger.debug("After: The minimum pixel value is {}, the maximum is
-        # {}".format(np.min(rec.frames[0]), np.max(rec.frames[0])))
         logger.debug("Done Mapping")
-
-    # logger.debug("Saving to type {}".format(opts.otype))
-    # logger.debug("Should be {}".format(OutputTypes.TiffStack))
-    # logger.debug("They are equal {}"
-    # .format(str(OutputTypes.TiffStack)==opts.otype))
 
     if (opts.otype == str(OutputTypes.IndividualTiff)):
         numframes = len(rec.frames)
@@ -414,28 +451,6 @@ def main(opts):
     elif (opts.otype == str(OutputTypes.TestFile)):
         tifffile.imsave(opts.output, rec.frames[0])
         logger.info("Wrote the test file")
-
-    elif (opts.otype == str(OutputTypes.VirtualBF)):
-        xdim, ydim = determine_recorder_image_dimension()
-        oimage = np.zeros((xdim*ydim), dtype=rec.frames[0].dtype)
-        # ZOB center offset
-        zoboffset = list(map(float, opts.vbfcenter.split('x')))
-        # generate
-        mask = virtual_bf_mask(rec.frames[0], zoboffset, opts.vbfradius)
-        for i, frame in enumerate(rec.frames[:xdim*ydim]):
-            oimage[i] = frame[mask].mean()
-        oimage.shape = (xdim, ydim)
-        # correct for meander scanning of rotator
-        if (opts.rotator):
-            oimage[::2] = oimage[::2][:, ::-1]
-            # correct for hysteresis
-            if opts.hysteresis != 0:
-                logger.info("Correcting for hysteresis...")
-                oimage[::2] = np.roll(oimage[::2], opts.hysteresis, axis=1)
-                logger.info("Rescaling to valid area...")
-                oimage = oimage[:, opts.hysteresis:]
-        logger.info("Writing out image")
-        tifffile.imsave(opts.output, oimage)
 
     elif (opts.otype == str(OutputTypes.Blockfile) or
           opts.otype == OutputTypes.Blockfile):
