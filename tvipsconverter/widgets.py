@@ -1,12 +1,61 @@
 from PyQt5 import uic
 from PyQt5.QtWidgets import (QApplication, QFileDialog, QGraphicsScene,
-                             QGraphicsPixmapItem)
+                             QGraphicsPixmapItem, QMainWindow, QMessageBox)
 from PyQt5.QtGui import QImage, QPixmap
-from utils import recorder
-import os
+from PyQt5.QtCore import QThread, pyqtSignal
+from utils import recorder as rec
+import sys
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as
+                                                FigureCanvas)
+from pathlib import Path
+import logging
+from time import sleep
+logging.basicConfig(level=logging.DEBUG)
+sys.path.append(".")
 
 # import the UI interface
-rawgui, Window = uic.loadUiType("widget_2.ui")
+rawgui, Window = uic.loadUiType("./tvipsconverter/widget_2.ui")
+
+#
+# class export_to_hdf5_thread(QThread):
+#     readfile = pyqtSignal(int)
+#
+#     def __init__(self, ipath, opath, improc, vbfsett, progbar):
+#         QThread.__init__(self)
+#         self.inpath = ipath
+#         self.oupath = opath
+#         self.improc = improc
+#         self.vbfsettings = vbfsett
+#         self.progressBar = progbar
+#
+#     def __del__(self):
+#         self.wait()
+#
+#     def run(self):
+#         rec.convertToHDF5(self.inpath, self.oupath, self.improc,
+#                           self.vbfsettings, progbar=self.progressBar)
+
+
+class External(QThread):
+    """
+    Runs a counter thread.
+    """
+    countChanged = pyqtSignal(int)
+    finish = pyqtSignal()
+
+    def __init__(self, fin):
+        QThread.__init__(self)
+        self.fin = fin
+
+    def run(self):
+        count = 0
+        while count < self.fin:
+            count += 1
+            sleep(0.1)
+            self.countChanged.emit(count)
+        self.finish.emit()
 
 
 class ConnectedWidget(rawgui):
@@ -15,164 +64,229 @@ class ConnectedWidget(rawgui):
         super().__init__()
         self.window = window
         self.setupUi(window)
+
+        self.original_preview = None
+        self.path_preview = None
+
         self.connectUI()
 
     def connectUI(self):
         # initial browse button
-        self.pushButton.clicked.connect(
-            lambda: self.openFileBrowser(self.lineEdit, "TVIPS (*.tvips);;\
-                                                        BLO (*.blo);;\
-                                                        TIFF (*.tiff *.tif)"))
-        # select a folder
-        self.pushButton_2.clicked.connect(
-            lambda: self.openFolderBrowser(self.lineEdit_2))
+        self.pushButton.clicked.connect(self.open_tvips_file)
 
         # update button on the preview
-        self.pushButton_4.clicked.connect(self.updatePreviewDebug)
+        self.pushButton_4.clicked.connect(self.updatePreview)
+        #
+        # # execute the conversion command
+        self.pushButton_3.clicked.connect(self.get_hdf5_path)
+        # shitty workaround for saving to hdf5 with updated gui
+        self.pushButton_6.clicked.connect(self.write_to_hdf5)
+        # self.pushButton_3.clicked.connect(self.exportFiles)
+        # test threading
+        self.pushButton_2.clicked.connect(self.threadCheck)
+        #
+        # # deactivate part of the gui upon activation
+        # self.checkBox_8.stateChanged.connect(self.updateActive)
+        # self.checkBox_3.stateChanged.connect(self.updateActive)
+        # self.checkBox_7.stateChanged.connect(self.updateActive)
+        # self.checkBox_5.stateChanged.connect(self.updateActive)
+        # self.checkBox_4.stateChanged.connect(self.updateActive)
+        # self.checkBox_6.stateChanged.connect(self.updateActive)
+        # self.updateActive()
 
-        # execute the conversion command
-        self.pushButton_3.clicked.connect(self.exportFiles)
+    def threadCheck(self):
+        self.calc = External(50)
+        self.calc.countChanged.connect(self.onCountChanged)
+        self.calc.finish.connect(self.done)
+        self.calc.start()
+        self.window.setEnabled(False)
 
-        # deactivate part of the gui upon activation
-        self.checkBox_8.stateChanged.connect(self.updateActive)
-        self.checkBox_3.stateChanged.connect(self.updateActive)
-        self.checkBox_7.stateChanged.connect(self.updateActive)
-        self.checkBox_5.stateChanged.connect(self.updateActive)
-        self.checkBox_4.stateChanged.connect(self.updateActive)
-        self.checkBox_6.stateChanged.connect(self.updateActive)
-        self.updateActive()
+    def onCountChanged(self, value):
+        self.progressBar.setValue(value)
 
-    def updateActive(self):
-        if self.checkBox_8.checkState() == 2:
-            self.spinBox_11.setEnabled(True)
-        else:
-            self.spinBox_11.setEnabled(False)
+    def done(self):
+        self.window.setEnabled(True)
 
-        if self.checkBox_3.checkState() == 2:
-            self.spinBox_6.setEnabled(True)
-            self.doubleSpinBox.setEnabled(True)
-        else:
-            self.spinBox_6.setEnabled(False)
-            self.doubleSpinBox.setEnabled(False)
+    def open_tvips_file(self):
+        path = self.openFileBrowser("TVIPS (*.tvips)")
+        # check if it's a valid file
+        if path:
+            try:
+                rec.Recorder.valid_first_tvips_file(path)
+                self.lineEdit.setText(path)
+                self.statusedit.setText("Selected tvips file")
+            except Exception as e:
+                self.lineEdit.setText("")
+                self.statusedit.setText(str(e))
 
-        if self.checkBox_7.checkState() == 2:
-            self.spinBox_10.setEnabled(True)
-        else:
-            self.spinBox_10.setEnabled(False)
+    def openFileBrowser(self, fs):
+        path, okpres = QFileDialog.getOpenFileName(caption="Select file",
+                                                   filter=fs)
+        if okpres:
+            return str(Path(path))
 
-        if self.checkBox_5.checkState() == 2:
-            self.spinBox_3.setEnabled(True)
-        else:
-            self.spinBox_3.setEnabled(False)
-
-        if self.checkBox_4.checkState() == 2:
-            self.spinBox_7.setEnabled(True)
-            self.spinBox_8.setEnabled(True)
-        else:
-            self.spinBox_7.setEnabled(False)
-            self.spinBox_8.setEnabled(False)
-
-        if self.checkBox_6.checkState() == 2:
-            self.spinBox_9.setEnabled(True)
-        else:
-            self.spinBox_9.setEnabled(False)
-
-    def openFileBrowser(self, le, fs):
+    def saveFileBrowser(self, fs):
         path, okpres = QFileDialog.getSaveFileName(caption="Select file",
                                                    filter=fs)
         if okpres:
-            le.setText(path)
+            return str(Path(path))
 
-    def openFolderBrowser(self, le):
+    def openFolderBrowser(self):
         path = QFileDialog.getExistingDirectory(caption="Choose directory")
         if path:
-            le.setText(path)
+            return str(Path(path))
+
+    def read_modsettings(self):
+        path = self.lineEdit.text()
+        improc = {
+            "useint": self.checkBox_8.checkState(),
+            "whichint": self.spinBox_11.value(),
+            "usebin": self.checkBox_5.checkState(),
+            "whichbin": self.spinBox_3.value(),
+            "usegaus": self.checkBox_3.checkState(),
+            "gausks": self.spinBox_6.value(),
+            "gaussig": self.doubleSpinBox.value(),
+            "usemed": self.checkBox_7.checkState(),
+            "medks": self.spinBox_10.value(),
+            "usels": self.checkBox_4.checkState(),
+            "lsmin": self.spinBox_7.value(),
+            "lsmax": self.spinBox_8.value(),
+            "usecoffset": self.checkBox.checkState()
+        }
+        vbfsettings = {
+            "calcvbf": self.checkBox_10.checkState(),
+            "vbfrad": self.spinBox_12.value(),
+            "vbfxoffset": self.spinBox_13.value(),
+            "vbfyoffset": self.spinBox_14.value()
+        }
+        return path, improc, vbfsettings
 
     def updatePreview(self):
-        self.readValues()
+        """Read the first image from the file and create a preview"""
+        # read the gui info
+        path, improc, vbfsettings = self.read_modsettings()
         # create one image properly processed
         try:
-            recorder.createOneImageUI(**self.uivalues)
-            # plot this figure
-            image = QImage('./temp.tiff')
-            pixmap = QPixmap.fromImage(image)
+            if not path:
+                raise Exception("A TVIPS file must be selected!")
+            # get and calculate the image. Also get old image and new image
+            # size. only change original image if there is none or the path
+            # has changed
+            if (self.original_preview is None) or (self.path_preview != path):
+                self.update_line(self.statusedit, "Extracting frame...")
+                self.original_preview = rec.getOriginalPreviewImage(
+                                                path, improc=improc,
+                                                vbfsettings=vbfsettings)
+            # update the path
+            self.path_preview = path
+            ois = self.original_preview.shape
+            filterframe = rec.filter_image(self.original_preview, **improc)
+            nis = filterframe.shape
+            # check if the VBF aperture fits in the frame
+            if vbfsettings["calcvbf"]:
+                midx = nis[1]//2
+                midy = nis[0]//2
+                xx = vbfsettings["vbfxoffset"]
+                yy = vbfsettings["vbfyoffset"]
+                rr = vbfsettings["vbfrad"]
+                if (midx+xx-rr < 0 or
+                   midx+xx+rr > nis[1] or
+                   midy+yy-rr < 0 or
+                   midy+yy-rr > nis[0]):
+                    raise Exception("Virtual bright field aperture out "
+                                    "of bounds")
+            # plot the image and the circle over it
+            fig = plt.figure(frameon=False,
+                             figsize=(filterframe.shape[1]/100,
+                                      filterframe.shape[0]/100))
+            canvas = FigureCanvas(fig)
+            ax = plt.Axes(fig, [0., 0., 1., 1.])
+            ax.set_axis_off()
+            fig.add_axes(ax)
+            ax.imshow(filterframe, cmap="Greys_r")
+            if vbfsettings["calcvbf"]:
+                xoff = vbfsettings["vbfxoffset"]
+                yoff = vbfsettings["vbfyoffset"]
+                circ = Circle((filterframe.shape[1]//2+xoff,
+                               filterframe.shape[0]//2+yoff),
+                              vbfsettings["vbfrad"],
+                              color="red",
+                              alpha=0.5)
+                ax.add_patch(circ)
+            canvas.draw()
             scene = QGraphicsScene()
-            scene.addItem(QGraphicsPixmapItem(pixmap))
+            scene.addWidget(canvas)
             self.graphicsView.setScene(scene)
             self.graphicsView.fitInView(scene.sceneRect())
-            self.statusedit.setText("Status: Succesfully created preview.")
-            shpx = image.width()
-            shpy = image.height()
-            self.lineEdit_4.setText(f"Image size: {shpx}x{shpy} pixels")
-            self.hardRepaint()
+            self.repaint_widget(self.graphicsView)
+            self.update_line(self.statusedit, "Succesfully created preview.")
+            self.update_line(self.lineEdit_8, f"Original: {ois[0]}x{ois[1]}. "
+                                              f"New: {nis[0]}x{nis[1]}.")
+            plt.close(fig)
         except Exception as e:
-            self.statusedit.setText(f"Status: An error occured while creating "
-                                    f"preview: {e}")
-            self.hardRepaint()
+            self.update_line(self.statusedit, f"Error: {e}")
+            # empty the preview
+            self.update_line(self.lineEdit_8, "")
+            scene = QGraphicsScene()
+            self.graphicsView.setScene(scene)
+            self.repaint_widget(self.graphicsView)
+            self.original_preview = None
+            self.path_preview = None
 
-    def updatePreviewDebug(self):
-        self.readValues()
-        # create one image properly processed
-        recorder.createOneImageUI(**self.uivalues)
-        # plot this figure
-        image = QImage('./temp.tiff')
-        pixmap = QPixmap.fromImage(image)
-        scene = QGraphicsScene()
-        scene.addItem(QGraphicsPixmapItem(pixmap))
-        self.graphicsView.setScene(scene)
-        self.graphicsView.fitInView(scene.sceneRect())
-        self.statusedit.setText("Status: Succesfully created preview.")
-        shpx = image.width()
-        shpy = image.height()
-        self.lineEdit_4.setText("Image size: {}x{} pixels".format(shpx, shpy))
-        self.hardRepaint()
+    def repaint_widget(self, widget):
+        widget.hide()
+        widget.show()
 
-    def exportFiles(self):
-        self.readValues()
-        # #create one image properly processed
-        condition = (os.path.exists(self.uivalues["inp"]) and
-                     os.path.exists(self.uivalues["oup"]) and
-                     self.uivalues["pref"] != "")
-        if condition:
-            self.statusedit.setText("Status: Busy ...")
-            self.hardRepaint()
+    def update_line(self, line, string):
+        line.setText(string)
+        line.hide()
+        line.show()
 
-            recorder.mainUI(**self.uivalues)
-            self.statusedit.setText("Status: Done converting file.")
-            self.hardRepaint()
-        else:
-            self.statusedit.setText("Status: Must provide valid input and "
-                                    "output arguments.")
-            self.hardRepaint()
+    def get_hdf5_path(self):
+        # open a savefile browser
+        try:
+            # read the gui info
+            (self.inpath, self.improc,
+             self.vbfsettings) = self.read_modsettings()
+            if not self.inpath:
+                raise Exception("A TVIPS file must be selected!")
+            self.oupath = self.saveFileBrowser("HDF5 (*.hdf5)")
+            if not self.oupath:
+                raise Exception("No valid HDF5 file path selected")
+            self.lineEdit_2.setText(self.oupath)
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
 
-    def readValues(self):
-        '''Read and return the current UI values'''
-        self.uivalues = {
-         "inp": self.lineEdit.text(),  # input path
-         "oup": self.lineEdit_2.text(),  # output path
-         "pref": self.lineEdit_3.text(),  # prefix out
-         "oupt": self.comboBox.currentText(),  # output type
-         "dep": self.comboBox_2.currentText(),  # output depth (uint8, uint16)
-         "sdx": self.spinBox.value(),  # scanning dimension x
-         "sdy": self.spinBox_2.value(),  # scanning dimension y
-         "use_bin": self.checkBox_5.checkState(),  # use binning
-         "bin_fac": self.spinBox_3.value(),  # binning factor
-         "use_scaling": self.checkBox_4.checkState(),  # use scaling
-         "scalemin": self.spinBox_7.value(),  # scaling minimum intensiy
-         "scalemax": self.spinBox_8.value(),  # scaling maximum intensity
-         "use_gauss": self.checkBox_3.checkState(),  # use gaussian filter
-         "gauss_ks": self.spinBox_6.value(),  # gaussian kernel size
-         "gauss_sig": self.doubleSpinBox.value(),  # gaussian sigma
-         "use_med": self.checkBox_7.checkState(),  # us e median filter
-         "med_ks": self.spinBox_10.value(),  # median filter kernel size
-         "use_rotator": self.checkBox.checkState(),  # use rotator
-         "use_hyst": self.checkBox_6.checkState(),  # use hysteresis
-         "hyst_val": self.spinBox_9.value(),  # value of hysteresis
-         "skip": self.spinBox_4.value(),  # skipp first frames
-         "trunc": self.spinBox_5.value(),  # skipp last frames
-         "useintcut": self.checkBox_8.checkState(),
-         "intcut": self.spinBox_11.value()
-        }
+    def write_to_hdf5(self):
+        # try:
+        (self.inpath, self.improc,
+         self.vbfsettings) = self.read_modsettings()
+        if not self.inpath:
+            raise Exception("A TVIPS file must be selected!")
+        self.oupath = self.lineEdit_2.text()
+        if not self.oupath:
+            raise Exception("No valid HDF5 file path selected")
+        # read the gui info
+        self.update_line(self.statusedit, f"Exporting to {self.oupath}")
+        path = self.inpath
+        opath = self.oupath
+        improc = self.improc
+        vbfsettings = self.vbfsettings
+        self.get_thread = rec.Recorder(path,
+                                       improc=improc,
+                                       vbfsettings=vbfsettings,
+                                       outputpath=opath)
+        self.get_thread.increase_progress.connect(self.increase_progbar)
+        self.get_thread.finish.connect(self.done)
+        self.get_thread.start()
+        self.window.setEnabled(False)
+        self.update_line(self.statusedit,
+                         f"Succesfully exported to HDF5")
+        # except Exception as e:
+        #    self.update_line(self.statusedit, f"Error: {e}")
+
+    def increase_progbar(self, value):
+        self.progressBar.setValue(value)
 
     def hardRepaint(self):
         self.window.hide()
@@ -182,9 +296,12 @@ class ConnectedWidget(rawgui):
 def main():
     app = QApplication([])
     window = Window()
-    _ = ConnectedWidget(window)
-    window.setWindowTitle("TVIPS / blo converter")
+    form = ConnectedWidget(window)
+    window.setWindowTitle("TVIPS converter")
     window.show()
+    form.lineEdit.setText("/Volumes/Elements/200309-2F/"
+                          "rec_20200309_113857_000.tvips")
+    form.lineEdit_2.setText("/Users/nielscautaerts/Desktop/stream_2.hdf5")
     app.exec_()
 
 
@@ -205,4 +322,4 @@ def mainDebug():
 
 
 if __name__ == "__main__":
-    mainDebug()
+    main()
