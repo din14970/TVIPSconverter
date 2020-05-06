@@ -12,9 +12,10 @@ from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as
 from pathlib import Path
 import logging
 from time import sleep
+import numpy as np
 logging.basicConfig(level=logging.DEBUG)
 sys.path.append(".")
-
+logger = logging.getLogger(__name__)
 # import the UI interface
 rawgui, Window = uic.loadUiType("./tvipsconverter/widget_2.ui")
 
@@ -68,6 +69,18 @@ class ConnectedWidget(rawgui):
         self.original_preview = None
         self.path_preview = None
 
+        # has a valid hdf5 file been selected or not
+        self.valid_hdf5 = False
+
+        # data storage for preview (only need figure)
+        self.fig_prev = None
+
+        # data storage for vbf preview
+        self.vbf_data = None
+        self.vbf_sets = None  # settings
+        self.fig_vbf = None
+        self.vbf_im = None
+
         self.connectUI()
 
     def connectUI(self):
@@ -81,10 +94,19 @@ class ConnectedWidget(rawgui):
         self.pushButton_3.clicked.connect(self.get_hdf5_path)
         # shitty workaround for saving to hdf5 with updated gui
         self.pushButton_6.clicked.connect(self.write_to_hdf5)
+        self.lineEdit_4.textChanged.connect(self.auto_read_hdf5)
         # self.pushButton_3.clicked.connect(self.exportFiles)
         # test threading
         self.pushButton_2.clicked.connect(self.threadCheck)
-        #
+        # browse to select a file
+        self.pushButton_8.clicked.connect(self.select_hdf5_file)
+        # auto update custom scan dimensions (spinbox 16)
+        self.spinBox.valueChanged.connect(self.update_final_frame)
+        self.spinBox_2.valueChanged.connect(self.update_final_frame)
+        self.spinBox_15.valueChanged.connect(self.update_final_frame)
+        self.checkBox_2.stateChanged.connect(self.update_final_frame)
+        # create a preview of the vbf
+        self.pushButton_10.clicked.connect(self.update_vbf)
         # # deactivate part of the gui upon activation
         # self.checkBox_8.stateChanged.connect(self.updateActive)
         # self.checkBox_3.stateChanged.connect(self.updateActive)
@@ -93,6 +115,22 @@ class ConnectedWidget(rawgui):
         # self.checkBox_4.stateChanged.connect(self.updateActive)
         # self.checkBox_6.stateChanged.connect(self.updateActive)
         # self.updateActive()
+
+    def update_final_frame(self):
+        if self.checkBox_2.checkState():
+            # we use self defined size
+            start = self.spinBox_15.value()
+            frms = self.spinBox.value()*self.spinBox_2.value()
+            self.spinBox_16.setValue(start+frms-1)
+        else:
+            # we use auto-size
+            start = self.spinBox_15.value()
+            frms = self.lineEdit_11.text()
+            try:
+                dim = np.sqrt(int(frms))
+                self.spinBox_16.setValue(start+dim**2-1)
+            except Exception:
+                self.spinBox_16.setValue(0)
 
     def threadCheck(self):
         self.calc = External(50)
@@ -103,9 +141,6 @@ class ConnectedWidget(rawgui):
 
     def onCountChanged(self, value):
         self.progressBar.setValue(value)
-
-    def done(self):
-        self.window.setEnabled(True)
 
     def open_tvips_file(self):
         path = self.openFileBrowser("TVIPS (*.tvips)")
@@ -196,13 +231,15 @@ class ConnectedWidget(rawgui):
                     raise Exception("Virtual bright field aperture out "
                                     "of bounds")
             # plot the image and the circle over it
-            fig = plt.figure(frameon=False,
-                             figsize=(filterframe.shape[1]/100,
-                                      filterframe.shape[0]/100))
-            canvas = FigureCanvas(fig)
-            ax = plt.Axes(fig, [0., 0., 1., 1.])
+            if self.fig_prev is not None:
+                plt.close(self.fig_prev)
+            self.fig_prev = plt.figure(frameon=False,
+                                       figsize=(filterframe.shape[1]/100,
+                                                filterframe.shape[0]/100))
+            canvas = FigureCanvas(self.fig_prev)
+            ax = plt.Axes(self.fig_prev, [0., 0., 1., 1.])
             ax.set_axis_off()
-            fig.add_axes(ax)
+            self.fig_prev.add_axes(ax)
             ax.imshow(filterframe, cmap="Greys_r")
             if vbfsettings["calcvbf"]:
                 xoff = vbfsettings["vbfxoffset"]
@@ -222,7 +259,6 @@ class ConnectedWidget(rawgui):
             self.update_line(self.statusedit, "Succesfully created preview.")
             self.update_line(self.lineEdit_8, f"Original: {ois[0]}x{ois[1]}. "
                                               f"New: {nis[0]}x{nis[1]}.")
-            plt.close(fig)
         except Exception as e:
             self.update_line(self.statusedit, f"Error: {e}")
             # empty the preview
@@ -257,33 +293,158 @@ class ConnectedWidget(rawgui):
         except Exception as e:
             self.update_line(self.statusedit, f"Error: {e}")
 
+    def select_hdf5_file(self):
+        # open an open file browser
+        try:
+            # read the gui info
+            hdf5path = self.openFileBrowser("HDF5 (*.hdf5)")
+            if not hdf5path:
+                raise Exception("No valid HDF5 file path selected")
+            self.lineEdit_4.setText(hdf5path)
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
+
+    def done(self):
+        self.window.setEnabled(True)
+
     def write_to_hdf5(self):
-        # try:
-        (self.inpath, self.improc,
-         self.vbfsettings) = self.read_modsettings()
-        if not self.inpath:
-            raise Exception("A TVIPS file must be selected!")
-        self.oupath = self.lineEdit_2.text()
-        if not self.oupath:
-            raise Exception("No valid HDF5 file path selected")
-        # read the gui info
-        self.update_line(self.statusedit, f"Exporting to {self.oupath}")
-        path = self.inpath
-        opath = self.oupath
-        improc = self.improc
-        vbfsettings = self.vbfsettings
-        self.get_thread = rec.Recorder(path,
-                                       improc=improc,
-                                       vbfsettings=vbfsettings,
-                                       outputpath=opath)
-        self.get_thread.increase_progress.connect(self.increase_progbar)
-        self.get_thread.finish.connect(self.done)
-        self.get_thread.start()
-        self.window.setEnabled(False)
+        try:
+            (self.inpath, self.improc,
+             self.vbfsettings) = self.read_modsettings()
+            if not self.inpath:
+                raise Exception("A TVIPS file must be selected!")
+            self.oupath = self.lineEdit_2.text()
+            if not self.oupath:
+                raise Exception("No valid HDF5 file path selected")
+            # read the gui info
+            self.update_line(self.statusedit, f"Exporting to {self.oupath}")
+            path = self.inpath
+            opath = self.oupath
+            improc = self.improc
+            vbfsettings = self.vbfsettings
+            self.get_thread = rec.Recorder(path,
+                                           improc=improc,
+                                           vbfsettings=vbfsettings,
+                                           outputpath=opath)
+            self.get_thread.increase_progress.connect(self.increase_progbar)
+            self.get_thread.finish.connect(self.done_hdf5export)
+            self.get_thread.start()
+            self.window.setEnabled(False)
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
+
+    def done_hdf5export(self):
+        self.window.setEnabled(True)
+        # also update lines in the second pannel
         self.update_line(self.statusedit,
                          f"Succesfully exported to HDF5")
-        # except Exception as e:
-        #    self.update_line(self.statusedit, f"Error: {e}")
+        # don't auto update, the gui may be before the file exists
+        # self.update_line(self.lineEdit_4, self.lineEdit_2.text())
+
+    def auto_read_hdf5(self):
+        """Update HDF5 field info if lineEdit_4 (path) is changed"""
+        try:
+            f = rec.hdf5Intermediate(self.lineEdit_4.text())
+            tot, star, en, roti, dim, imdimx, imdimy = f.get_scan_info()
+            if tot is not None:
+                self.update_line(self.lineEdit_3, str(tot))
+            else:
+                self.update_line(self.lineEdit_3, "?")
+            if star is not None:
+                self.update_line(self.lineEdit_5, str(star))
+            else:
+                self.update_line(self.lineEdit_5, "?")
+            if en is not None:
+                self.update_line(self.lineEdit_6, str(en))
+            else:
+                self.update_line(self.lineEdit_6, "?")
+            if roti is not None:
+                self.update_line(self.lineEdit_11, str(roti))
+            else:
+                self.update_line(self.lineEdit_11, "?")
+            if dim is not None:
+                self.update_line(self.lineEdit_12,
+                                 f"{str(int(dim))}x{str(int(dim))}")
+            else:
+                self.update_line(self.lineEdit_12, "?")
+            self.update_line(self.lineEdit_13,
+                             f"{str(imdimx)}x{str(imdimy)}")
+            self.update_final_frame()
+            f.close()
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
+            self.update_line(self.lineEdit_3, "")
+            self.update_line(self.lineEdit_5, "")
+            self.update_line(self.lineEdit_6, "")
+            self.update_line(self.lineEdit_11, "")
+            self.update_line(self.lineEdit_12, "")
+            self.update_line(self.lineEdit_12, "")
+
+    def update_vbf(self):
+        """Calculate the virtual bf """
+        path_hdf5 = self.lineEdit_4.text()
+        try:
+            # check if an hdf5 file is selected
+            if not path_hdf5:
+                raise Exception("No valid HDF5 file selected!")
+            # try to read the info from the file
+            f = rec.hdf5Intermediate(path_hdf5)
+            # none or 0 means default
+            start_frame = None
+            end_frame = None
+            sdimx = None
+            sdimy = None
+            hyst = 0
+            # overwrite standard info depending on gui
+            if self.checkBox_2.checkState():
+                # use custom scanning
+                sdimx = self.spinBox.value()
+                sdimy = self.spinBox_2.value()
+            if self.checkBox_11.checkState():
+                # use custom frames
+                start_frame = self.spinBox_15.value()
+                end_frame = self.spinBox_16.value()
+            # use hysteresis or not
+            if self.checkBox_6.checkState():
+                hyst = self.spinBox_9.value()
+            # calculate the image
+            logger.debug(f"We try to create a VBF image with data: "
+                         f"S.F. {start_frame}, E.F. {end_frame}, "
+                         f"Dims: x {sdimx} y {sdimy},"
+                         f"hyst: {hyst}")
+            self.vbf_data = f.get_vbf_image(sdimx, sdimy, start_frame,
+                                            end_frame, hyst)
+            logger.debug("Succesfully created the VBF array")
+            # save the settings for later storage
+            self.vbf_sets = {"start_frame": start_frame,
+                             "end_frame": end_frame,
+                             "scan_dim_x": sdimx,
+                             "scan_dim_y": sdimy,
+                             "hysteresis": hyst}
+            # plot the image and store it for further use. First close prior
+            # image
+            if self.fig_vbf is not None:
+                plt.close(self.fig_vbf)
+            self.fig_vbf = plt.figure(frameon=False,
+                                      figsize=(self.vbf_data.shape[1]/100,
+                                               self.vbf_data.shape[0]/100))
+            canvas = FigureCanvas(self.fig_vbf)
+            ax = plt.Axes(self.fig_vbf, [0., 0., 1., 1.])
+            ax.set_axis_off()
+            self.fig_vbf.add_axes(ax)
+            self.vbf_im = ax.imshow(self.vbf_data, cmap="plasma")
+            canvas.draw()
+            scene = QGraphicsScene()
+            scene.addWidget(canvas)
+            self.graphicsView_3.setScene(scene)
+            self.graphicsView_3.fitInView(scene.sceneRect())
+            self.repaint_widget(self.graphicsView_3)
+            self.update_line(self.statusedit, "Succesfully created VBF.")
+            yshap, xshap = self.vbf_data.shape
+            self.update_line(self.lineEdit_10, f"Size: {xshap}x{yshap}.")
+            f.close()
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
 
     def increase_progbar(self, value):
         self.progressBar.setValue(value)

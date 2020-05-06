@@ -135,12 +135,6 @@ def getOriginalPreviewImage(path, improc, vbfsettings):
     return firstframe
 
 
-# def convertToHDF5(inpath, outpath, improc, vbfsettings, progbar=None):
-#     rec = Recorder(inpath, improc=improc, vbfsettings=vbfsettings)
-#     rec.convert_to_hdf5(outpath)
-#     return True
-
-
 class Recorder(QThread):
 
     increase_progress = pyqtSignal(int)
@@ -174,16 +168,8 @@ class Recorder(QThread):
             self.outputpath = str(Path(self.outputpath))
 
     def run(self):
-        # count = 0
-        # while count < 100:
-        #     count += 1
-        #     self.docomplicatedthings(count)
         self.convert_HDF5()
         self.finish.emit()
-
-    # def docomplicatedthings(self, count):
-    #     sleep(0.2)
-    #     self.increase_progress.emit(count)
 
     def convert_HDF5(self):
         """
@@ -196,7 +182,10 @@ class Recorder(QThread):
         # progress as measured within files
         self.fileprog = 0
         # HDF5 object to write the raw data to
-        self.stream = h5py.File(self.outputpath, "w")
+        try:
+            self.stream = h5py.File(self.outputpath, "w")
+        except Exception:
+            raise Exception("This file already seems open somewhere else")
         self.streamgroup = self.stream.create_group("ImageStream")
         # also store immediately the processing info in attributes
         pg = self.streamgroup.create_group("Processing")
@@ -441,11 +430,10 @@ class Recorder(QThread):
             self.scangroup.attrs[
                 "final_rotinx"] = "None"
         # add a couple more attributes for good measure
+        self.scangroup.attrs["total_stream_frames"] = len(self.rotidxs)
         if self.end is not None and self.start is not None:
             self.scangroup.attrs[
                 "ims_between_start_end"] = self.end-self.start
-            self.scangroup.attrs[
-                "total_scan_ims"] = len(self.rotidxs)
 
     def _save_preliminary_scan_info(self):
         # save rotation indexes and vbf intensities
@@ -492,6 +480,171 @@ class Recorder(QThread):
                 oimage = oimage[:, opts.hysteresis:]
         logger.info("Writing out image")
         tifffile.imsave(opts.output, oimage)
+
+
+class hdf5Intermediate(h5py.File):
+    """This class represents the intermediate hdf5 file handle"""
+    def __init__(self, filepath, mode="r"):
+        super().__init__(filepath, mode)
+        (self.total_frames,
+         self.start_frame,
+         self.end_frame,
+         self.final_rotator,
+         dim, self.imdimx, self.imdimy) = self.get_scan_info()
+        self.sdimx = dim
+        self.sdimy = dim
+
+    def get_scan_info(self):
+        """Return total frames, start frame, end frame, guessed scan dimensions
+        as well as image dimensions"""
+        try:
+            tot = self["Scan"].attrs["total_stream_frames"]
+            tot = int(tot)
+        except Exception as e:
+            logger.debug(f"Total stream frames not found, error: {e}")
+            tot = None
+        try:
+            start = self["Scan"].attrs["start_frame"]
+            start = int(start)
+        except Exception as e:
+            logger.debug(f"start frame not found, error: {e}")
+            start = None
+        try:
+            end = self["Scan"].attrs["end_frame"]
+            end = int(end)
+        except Exception as e:
+            logger.debug(f"end frame not found, error: {e}")
+            end = None
+        try:
+            finrot = self["Scan"].attrs["final_rotinx"]
+            finrot = int(finrot)
+        except Exception as e:
+            logger.debug(f"final rotator index not found, error: {e}")
+            finrot = None
+        try:
+            dim = round(np.sqrt(finrot), 6)
+            if not dim == int(dim):
+                raise Exception
+            else:
+                dim = int(dim)
+        except Exception:
+            logger.debug(f"Could not calculate scan dimensions")
+            dim = None
+        try:
+            imdimx, imdimy = self["ImageStream"]["Frame_000000"].shape
+        except Exception:
+            imdimx = None
+            imdimy = None
+        return (tot, start, end, finrot, dim, imdimx, imdimy)
+
+    def get_vbf_image(self, sdimx=None, sdimy=None, start_frame=None,
+                      end_frame=None, hyst=0):
+        # try to get the rotator data
+        try:
+            vbfs = self["Scan"]["vbf_intensities"][:]
+        except Exception:
+            raise Exception("No VBF information found in dataset, please "
+                            "calculate from TVIPS file.")
+        logger.debug("Succesfully imported vbf intensities")
+        logger.debug("Now calculating scan indexes")
+        scan_indexes = self.calculate_scan_export_indexes(
+            sdimx=sdimx, sdimy=sdimy, start_frame=start_frame,
+            end_frame=end_frame, hyst=hyst)
+        logger.debug("Calculated scan indexes")
+        if sdimx is None:
+            sdimx = self.sdimx
+        if sdimy is None:
+            sdimy = self.sdimy
+        # if start_frame is None:
+        #     start_frame = self.start_frame
+        # if end_frame is None:
+        #     end_frame = self.end_frame
+        # try:
+        #     vbfs = vbfs[start_frame:end_frame+1]
+        # except Exception:
+        #     raise Exception("No valid start and stop indices found")
+        img = vbfs[scan_indexes].reshape(sdimy, sdimx)
+        logger.debug("Applied calculated indexes and retrieved image")
+        return img
+
+    def calculate_scan_export_indexes(self, sdimx=None, sdimy=None,
+                                      start_frame=None, end_frame=None,
+                                      hyst=0):
+        """Calculate the indexes of the list of frames to consider for the
+        scan or VBF"""
+        try:
+            rots = self["Scan"]["rotation_indexes"][:]
+        except Exception:
+            raise Exception("No VBF information found in dataset, please "
+                            "calculate from TVIPS file.")
+        logger.debug("Succesfully read rotator indexes")
+        # set the scan info
+        if sdimx is None:
+            sdimx = self.sdimx
+        if sdimy is None:
+            sdimy = self.sdimy
+        # check whether there are any dimensions
+        if not isinstance(sdimx, int) or not isinstance(sdimy, int):
+            raise Exception("No valid scan dimensions were found")
+        # if a start frame is given, it's easy, we ignore rots
+        if start_frame is not None:
+            if end_frame is None:
+                end_frame = start_frame + sdimx*sdimy - 1
+            if end_frame >= self.total_frames:
+                raise Exception("Final frame is out of bounds")
+            if end_frame <= start_frame:
+                raise Exception("Final frame index must be larger than "
+                                "first frame index")
+            if end_frame+1-start_frame != sdimx*sdimy:
+                raise Exception("Number of custom frames does not match "
+                                "scan dimension")
+            # just create an index array
+            sel = np.arange(start_frame, end_frame+1)
+            sel = sel.reshape(sdimy, sdimx)
+            # reverse correct even scan lines
+            sel[::2] = sel[::2][:, ::-1]
+            # hysteresis correction on even scan lines
+            sel[::2] = np.roll(sel[::2], hyst, axis=1)
+            return sel.ravel()
+        # if frames or not given, we must use our best guess and match
+        # rotators
+        else:
+            try:
+                rots = rots[self.start_frame:self.end_frame+1]
+            except Exception:
+                raise Exception("No valid first or last scan frames detected, "
+                                "must provide manual input")
+            # check whether sdimx*sdimy matches the final rotator index
+            if not isinstance(self.final_rotator, int):
+                raise Exception("No final rotator index found, "
+                                "can't align scan")
+            if sdimx*sdimy != self.final_rotator:
+                raise Exception("Scan dim x * scan dim y should match "
+                                "the final rotator index if no custom "
+                                "frames are specified")
+            indxs = np.zeros(sdimy*sdimx, dtype=int)
+            prevw = 1
+            for j, _ in enumerate(indxs):
+                # find where the argument is j
+                w = np.argwhere(rots == j+1)
+                if w.size > 0:
+                    w = w[0, 0]
+                    prevw = w
+                else:
+                    # move up if the rot index stays the same, otherwise copy
+                    if prevw+1 < len(rots):
+                        if rots[prevw+1] == rots[prevw]:
+                            prevw = prevw+1
+                    w = prevw
+                indxs[j] = w
+            # just an array of indexes
+            img = indxs.reshape(sdimy, sdimx)
+            # reverse correct even scan lines
+            img[::2] = img[::2][:, ::-1]
+            # hysteresis correction on even scan lines
+            img[::2] = np.roll(img[::2], hyst, axis=1)
+            # add the start index
+            return img.ravel()+self.start_frame
 
 
 class OutputTypes(Enum):
@@ -591,169 +744,3 @@ def main(opts):
         logger.debug("Finished writing the blo file")
     else:
         raise ValueError("No output type specified (--otype)")
-
-
-def mainCLI():
-    """Main function as run from the command line
-
-    The argparse arguments are passed directly to the main function
-    """
-    parser = argparse.ArgumentParser(
-     description='Process .tvips recorder format')
-
-    parser.add_argument('--otype', type=OutputTypes, choices=list(OutputTypes),
-                        help='Output format')
-    parser.add_argument("--numframes", type=int, default=None,
-                        help="Limit data to the first n frames")
-    parser.add_argument("--binning", type=int, default=None, help="Bin data")
-    parser.add_argument("--dumpheaders", action="store_true", default=False,
-                        help="Dump headers")
-    parser.add_argument('--depth', choices=("uint8", "uint16", "float"),
-                        default=None)
-    parser.add_argument('--linscale',
-                        help=("Scale 16 bit data linear to 8 bit using the "
-                              "given range. Eg. 100-1000. Default: min, max"),
-                        default=None)
-    parser.add_argument('--coffset', action='store_true', default=False)
-    # Virtual BF/blo options
-    parser.add_argument('--vbfcenter', default='0.0x0.0',
-                        help='Offset to center of Zero Order Beam')
-    parser.add_argument('--vbfradius', default=10.0, type=float,
-                        help='Integration disk radius')
-    parser.add_argument('--dimension',
-                        help='Output dimensions, default: sqrt(#images)^2')
-    parser.add_argument('--rotator', action="store_true",
-                        help="Pick only valid rotator frames")
-    parser.add_argument('--hysteresis', default=0, type=int,
-                        help='Move every second row by n pixel')
-    parser.add_argument('--postmag', default=1.0, type=float,
-                        help="Apply a mag correction")
-    parser.add_argument('--skip', default=0, type=int,
-                        help='Skip # images at the beginning')
-    parser.add_argument('--truncate', default=0, type=int,
-                        help='Truncate # images at the end')
-    # self added
-    parser.add_argument('--fprefix', default=None,
-                        help='Output Image/file name')
-    parser.add_argument('--cutoff', default=None, type=int,
-                        help='intensity cut off set to 0')
-    parser.add_argument('--median_kernel', default=None, type=int,
-                        help='median kernel size')
-    parser.add_argument('--gaus_kernel', default=None, type=int,
-                        help='gausian kernel size')
-    parser.add_argument('--gaus_sig', default=None, type=int,
-                        help='gaus filter sigma')
-    parser.add_argument('input', help="Input filename, must be _000.tvips")
-    parser.add_argument('output', help="Output dir or output filename")
-    opts = parser.parse_args()
-    main(opts)
-
-
-def mainUI(**k):
-    """Main function as run from the gui
-
-    The arguments k represent those read from the gui. These are converted
-    to arguments that the main converter function understands.
-    """
-    ks = SimpleNamespace(**k)
-    d = {}
-    if ks.oupt == ".blo":
-        d["otype"] = "blo"
-        d["output"] = ks.oup+"/{}.blo".format(ks.pref)
-    if ks.oupt == "list of .tiff":
-        d["otype"] = "Individual"
-        d["output"] = ks.oup
-        d["fprefix"] = ks.pref
-    d["numframes"] = None
-    if ks.use_bin == 2:
-        d["binning"] = ks.bin_fac
-    else:
-        d["binning"] = None
-    d["depth"] = ks.dep
-    if ks.use_scaling == 2:
-        d["linscale"] = "{}-{}".format(ks.scalemin, ks.scalemax)
-    else:
-        d["linscale"] = None
-    d["dimension"] = "{}x{}".format(ks.sdx, ks.sdy)
-    d["rotator"] = (ks.use_rotator == 2)
-    d["dumpheaders"] = False
-    d["coffset"] = False
-    d["postmag"] = 1.0
-    if ks.use_hyst == 2:
-        d["hysteresis"] = ks.hyst_val
-    else:
-        d["hysteresis"] = 0
-    d["skip"] = ks.skip
-    d["truncate"] = ks.trunc
-    d["input"] = ks.inp
-    # self created args
-    if ks.useintcut == 2:
-        d["cutoff"] = ks.intcut
-    else:
-        d["cutoff"] = None
-    if ks.use_med == 2:
-        d["median_kernel"] = ks.med_ks
-    else:
-        d["median_kernel"] = None
-    if ks.use_gauss == 2:
-        d["gaus_kernel"] = ks.gauss_ks
-        d["gaus_sig"] = ks.gauss_sig
-    else:
-        d["gaus_kernel"] = None
-        d["gaus_sig"] = None
-    opts = SimpleNamespace(**d)
-    main(opts)
-
-
-def createOneImageUI(**k):
-    """
-    Extract the first image from the file using the main function
-
-    Some arguments are read from the GUI and sent into a simplenamespace.
-    Arguments mainly relate to processing of the image.
-    """
-    # extracted info from the gui
-    ks = SimpleNamespace(**k)
-    # create the args sent to main
-    d = {}
-    d["otype"] = "TestFile"
-    d["numframes"] = 1
-    if ks.use_bin == 2:
-        d["binning"] = ks.bin_fac
-    else:
-        d["binning"] = None
-    d["depth"] = ks.dep
-    if ks.use_scaling == 2:
-        d["linscale"] = "{}-{}".format(ks.scalemin, ks.scalemax)
-    else:
-        d["linscale"] = None
-    d["dimension"] = "{}x{}".format(ks.sdx, ks.sdy)
-    d["rotator"] = False  # (ks.use_rotator==2)
-    d["dumpheaders"] = False
-    d["coffset"] = False
-    d["hysteresis"] = 0
-    d["skip"] = 0  # ks.skip
-    d["truncate"] = 0  # ks.trunc
-    d["input"] = ks.inp
-    d["output"] = "./temp.tiff"
-    # self created args
-    if ks.useintcut == 2:
-        d["cutoff"] = ks.intcut
-    else:
-        d["cutoff"] = None
-    if ks.use_med == 2:
-        d["median_kernel"] = ks.med_ks
-    else:
-        d["median_kernel"] = None
-    if ks.use_gauss == 2:
-        d["gaus_kernel"] = ks.gauss_ks
-        d["gaus_sig"] = ks.gauss_sig
-    else:
-        d["gaus_kernel"] = None
-        d["gaus_sig"] = None
-    opts = SimpleNamespace(**d)
-    main(opts)
-
-
-if __name__ == "__main__":
-    mainCLI()
