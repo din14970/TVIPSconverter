@@ -1,5 +1,5 @@
 import logging
-from utils import imagefun
+from . import imagefun
 from pathlib import Path
 import tifffile
 

@@ -1,7 +1,6 @@
 from PyQt5 import uic
 from PyQt5.QtWidgets import (QApplication, QFileDialog, QGraphicsScene)
 from PyQt5.QtCore import QThread, pyqtSignal
-from utils import recorder as rec
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
@@ -13,14 +12,17 @@ from time import sleep
 import numpy as np
 import os
 
-from utils import blockfile as blf
-from utils import tiffexport as tfe
+from .utils import recorder as rec
+from .utils import blockfile as blf
+from .utils import tiffexport as tfe
 
 logging.basicConfig(level=logging.DEBUG)
 sys.path.append(".")
+
 logger = logging.getLogger(__name__)
 # import the UI interface
-rawgui, Window = uic.loadUiType("./tvipsconverter/widget_2.ui")
+rawgui, Window = uic.loadUiType(str(Path(__file__).parent.absolute()) +
+                                "/widget_2.ui")
 
 
 class External(QThread):

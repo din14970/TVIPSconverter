@@ -20,7 +20,7 @@ In the future we aim to support:
 2. Create a new virtual environment on your system to install tvipsconverter in
 
 	```
-	$ conda create --name tvipsconverter
+	$ conda create --name tvipsconverter pip
 	```
 
 3. Activate the virtual environment anywhere in your system with
