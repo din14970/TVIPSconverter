@@ -2,17 +2,10 @@
 import os.path
 from tifffile import FileHandle
 import math
-import gc
-import argparse
-import tifffile
-from types import SimpleNamespace
 import h5py
 from pathlib import Path
 import re
 from PyQt5.QtCore import QThread, pyqtSignal
-from time import sleep
-
-from enum import Enum
 
 import logging
 from .imagefun import (normalize_convert, bin2, gausfilter,
@@ -20,7 +13,6 @@ from .imagefun import (normalize_convert, bin2, gausfilter,
 
 # Initialize the Logger
 logger = logging.getLogger(__name__)
-# logger.setLevel(logging.DEBUG)
 
 TVIPS_RECORDER_GENERAL_HEADER = [
     ('size', 'u4'),  # unused - likely the size of generalheader in bytes
@@ -464,23 +456,6 @@ class Recorder(QThread):
             logger.debug("Image dimensions: {}x{}".format(self.xdim,
                                                           self.ydim))
 
-    def make_virtual_bf(self, opts):
-        oimage = np.zeros((self.xdim*self.ydim), dtype=float)
-        for i, frame in enumerate(rec.frames[:xdim*ydim]):
-            oimage[i] = frame[mask].mean()
-        oimage.shape = (xdim, ydim)
-        # correct for meander scanning of rotator
-        if (opts.rotator):
-            oimage[::2] = oimage[::2][:, ::-1]
-            # correct for hysteresis
-            if opts.hysteresis != 0:
-                logger.info("Correcting for hysteresis...")
-                oimage[::2] = np.roll(oimage[::2], opts.hysteresis, axis=1)
-                logger.info("Rescaling to valid area...")
-                oimage = oimage[:, opts.hysteresis:]
-        logger.info("Writing out image")
-        tifffile.imsave(opts.output, oimage)
-
 
 class hdf5Intermediate(h5py.File):
     """This class represents the intermediate hdf5 file handle"""
@@ -555,17 +530,26 @@ class hdf5Intermediate(h5py.File):
             sdimx = self.sdimx
         if sdimy is None:
             sdimy = self.sdimy
-        # if start_frame is None:
-        #     start_frame = self.start_frame
-        # if end_frame is None:
-        #     end_frame = self.end_frame
-        # try:
-        #     vbfs = vbfs[start_frame:end_frame+1]
-        # except Exception:
-        #     raise Exception("No valid start and stop indices found")
         img = vbfs[scan_indexes].reshape(sdimy, sdimx)
         logger.debug("Applied calculated indexes and retrieved image")
         return img
+
+    def get_blo_export_data(self, sdimx=None, sdimy=None, start_frame=None,
+                            end_frame=None, hyst=0):
+        scan_indexes = self.calculate_scan_export_indexes(
+            sdimx=sdimx, sdimy=sdimy, start_frame=start_frame,
+            end_frame=end_frame, hyst=hyst)
+        logger.debug("Calculated scan indexes")
+        if sdimx is None:
+            sdimx = self.sdimx
+        if sdimy is None:
+            sdimy = self.sdimy
+        try:
+            imshap = self["ImageStream"]["Frame_000000"].shape
+        except Exception:
+            raise Exception("Could not find image size")
+        shape = (sdimx, sdimy, *imshap)
+        return shape, scan_indexes
 
     def calculate_scan_export_indexes(self, sdimx=None, sdimy=None,
                                       start_frame=None, end_frame=None,
@@ -646,101 +630,81 @@ class hdf5Intermediate(h5py.File):
             # add the start index
             return img.ravel()+self.start_frame
 
+# class OutputTypes(Enum):
+#     IndividualTiff = "Individual"
+#     TiffStack = "TiffStack"
+#     TestFile = "TestFile"
+#     Blockfile = "blo"
+#     VirtualBF = "VirtualBF"
+#
+#     def __str__(self):
+#         return self.value
 
-class OutputTypes(Enum):
-    IndividualTiff = "Individual"
-    TiffStack = "TiffStack"
-    TestFile = "TestFile"
-    Blockfile = "blo"
-    VirtualBF = "VirtualBF"
 
-    def __str__(self):
-        return self.value
-
-
-def main(opts):
-    """Main function that runs the transform depending on options"""
-    logger.debug(str(opts))
-
-    # read in file
-    assert (os.path.exists(opts.input))
-
-    # read tvips file
-    # default numframes is none
-    rec = Recorder(opts)
-
-    if (opts.depth is not None):
-        dtype = np.dtype(opts.depth)  # parse dtype
-        logger.debug("Mapping data to {}...".format(opts.depth))
-        rec.frames = rec.frames.astype(dtype)
-        logger.debug("Done Mapping")
-
-    if (opts.otype == str(OutputTypes.IndividualTiff)):
-        numframes = len(rec.frames)
-        amount_of_digits = len(str(numframes-1))
-
-        print("Start writing individual tif files to {}".format(opts.output))
-        if not os.path.exists(opts.output):
-            os.mkdir(opts.output)
-
-        filename = "{}_{:0" + str(amount_of_digits) + "d}.tif"
-        filename = os.path.join(opts.output, filename)
-
-        for i, frame in enumerate(rec.frames):
-            logger.info("Writing file {}".format(i))
-            tifffile.imsave(filename.format(opts.fprefix, i), frame)
-            logger.info("Finished writing file {}".format(i))
-
-    elif (opts.otype == str(OutputTypes.TiffStack)):
-        tifffile.imsave(opts.output, rec.toarray())
-
-    elif (opts.otype == str(OutputTypes.TestFile)):
-        tifffile.imsave(opts.output, rec.frames[0])
-        logger.info("Wrote the test file")
-
-    elif (opts.otype == str(OutputTypes.Blockfile) or
-          opts.otype == OutputTypes.Blockfile):
-        from . import blockfile
-        xdim, ydim = determine_recorder_image_dimension()
-
-        gc.collect()
-        arr = rec.frames
-
-        logger.debug("The frames are: {}".format(type(arr)))
-        logger.debug("The x and ydim: {}x{}".format(xdim, ydim))
-        if (len(arr) != xdim * ydim):
-            # extend it to the requested dimensions
-            missing = xdim*ydim - len(arr)
-            arr = np.concatenate((arr, missing * [np.zeros_like(arr[0]), ]))
-            logger.info("Data set filled up with {} frames for "
-                        "matching requested dimensions".format(missing))
-        arr.shape = (xdim, ydim, *arr[0].shape)
-        # reorder meander
-        arr[::2] = arr[::2][:, ::-1]
-        # np.savez_compressed("c:\\temp\\dump.npz", data=arr)
-        # TODO: check whether valid
-        # apply hysteresis correction
-        if opts.hysteresis != 0:
-            logger.info("Correcting for hysteresis...")
-            arr[::2] = np.roll(arr[::2], opts.hysteresis, axis=1)
-            logger.info("Rescaling to valid area...")
-            # arr = arr[:, opts.hysteresis:]
-        # write out as tiffstack for now, later blo file with good header
-        # tifffile.imsave(opts.output, arr, bigtiff=True)
-        # calculate header flags
-        # totalbinning = opts.binning * rec.general['binx']
-        # wl = getElectronWavelength(1000.0 * rec.general['ht'])
-        # pxsize = 1e-9 * rec.general['pixelsize']
-        # wl in A * cl in cm * px per meter
-        # ppcm = (wl*1e10 * rec.general['magtotal'] /
-        #        (pxsize*totalbinning*opts.postmag))
-
-        blockfile.file_writer_array(
-                opts.output, arr, 5, 1.075,
-                Camera_length=100.0*rec.general['magtotal'],
-                Beam_energy=rec.general['ht']*1000,
-                Distortion_N01=1.0, Distortion_N09=1.0,
-                Note="Cheers from TVIPS!")
-        logger.debug("Finished writing the blo file")
-    else:
-        raise ValueError("No output type specified (--otype)")
+# def main(opts):
+#     """Main function that runs the transform depending on options"""
+#     logger.debug(str(opts))
+#
+#     # read in file
+#     assert (os.path.exists(opts.input))
+#
+#     # read tvips file
+#     # default numframes is none
+#     rec = Recorder(opts)
+#
+#     if (opts.depth is not None):
+#         dtype = np.dtype(opts.depth)  # parse dtype
+#         logger.debug("Mapping data to {}...".format(opts.depth))
+#         rec.frames = rec.frames.astype(dtype)
+#         logger.debug("Done Mapping")
+#
+#     if (opts.otype == str(OutputTypes.IndividualTiff)):
+#         numframes = len(rec.frames)
+#         amount_of_digits = len(str(numframes-1))
+#
+#         print("Start writing individual tif files to {}".format(opts.output))
+#         if not os.path.exists(opts.output):
+#             os.mkdir(opts.output)
+#
+#         filename = "{}_{:0" + str(amount_of_digits) + "d}.tif"
+#         filename = os.path.join(opts.output, filename)
+#
+#         for i, frame in enumerate(rec.frames):
+#             logger.info("Writing file {}".format(i))
+#             tifffile.imsave(filename.format(opts.fprefix, i), frame)
+#             logger.info("Finished writing file {}".format(i))
+#
+#     elif (opts.otype == str(OutputTypes.TiffStack)):
+#         tifffile.imsave(opts.output, rec.toarray())
+#
+#     elif (opts.otype == str(OutputTypes.TestFile)):
+#         tifffile.imsave(opts.output, rec.frames[0])
+#         logger.info("Wrote the test file")
+#
+#     elif (opts.otype == str(OutputTypes.Blockfile) or
+#           opts.otype == OutputTypes.Blockfile):
+#         from . import blockfile
+#         xdim, ydim = determine_recorder_image_dimension()
+#
+#         gc.collect()  # garbage collector
+#         arr = rec.frames
+#
+#         logger.debug("The frames are: {}".format(type(arr)))
+#         logger.debug("The x and ydim: {}x{}".format(xdim, ydim))
+#         if (len(arr) != xdim * ydim):
+#             # extend it to the requested dimensions
+#             missing = xdim*ydim - len(arr)
+#             arr = np.concatenate((arr, missing * [np.zeros_like(arr[0]), ]))
+#             logger.info("Data set filled up with {} frames for "
+#                         "matching requested dimensions".format(missing))
+#         arr.shape = (xdim, ydim, *arr[0].shape)
+#
+#         blockfile.file_writer_array(
+#                 opts.output, arr, 5, 1.075,
+#                 Camera_length=100.0*rec.general['magtotal'],
+#                 Beam_energy=rec.general['ht']*1000,
+#                 Distortion_N01=1.0, Distortion_N09=1.0,
+#                 Note="Cheers from TVIPS!")
+#         logger.debug("Finished writing the blo file")
+#     else:
+#         raise ValueError("No output type specified (--otype)")

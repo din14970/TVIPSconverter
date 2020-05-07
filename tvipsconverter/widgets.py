@@ -1,7 +1,5 @@
 from PyQt5 import uic
-from PyQt5.QtWidgets import (QApplication, QFileDialog, QGraphicsScene,
-                             QGraphicsPixmapItem, QMainWindow, QMessageBox)
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import (QApplication, QFileDialog, QGraphicsScene)
 from PyQt5.QtCore import QThread, pyqtSignal
 from utils import recorder as rec
 import sys
@@ -13,30 +11,16 @@ from pathlib import Path
 import logging
 from time import sleep
 import numpy as np
+import os
+
+from utils import blockfile as blf
+from utils import tiffexport as tfe
+
 logging.basicConfig(level=logging.DEBUG)
 sys.path.append(".")
 logger = logging.getLogger(__name__)
 # import the UI interface
 rawgui, Window = uic.loadUiType("./tvipsconverter/widget_2.ui")
-
-#
-# class export_to_hdf5_thread(QThread):
-#     readfile = pyqtSignal(int)
-#
-#     def __init__(self, ipath, opath, improc, vbfsett, progbar):
-#         QThread.__init__(self)
-#         self.inpath = ipath
-#         self.oupath = opath
-#         self.improc = improc
-#         self.vbfsettings = vbfsett
-#         self.progressBar = progbar
-#
-#     def __del__(self):
-#         self.wait()
-#
-#     def run(self):
-#         rec.convertToHDF5(self.inpath, self.oupath, self.improc,
-#                           self.vbfsettings, progbar=self.progressBar)
 
 
 class External(QThread):
@@ -96,8 +80,8 @@ class ConnectedWidget(rawgui):
         self.pushButton_6.clicked.connect(self.write_to_hdf5)
         self.lineEdit_4.textChanged.connect(self.auto_read_hdf5)
         # self.pushButton_3.clicked.connect(self.exportFiles)
-        # test threading
-        self.pushButton_2.clicked.connect(self.threadCheck)
+        # exporting the preview
+        self.pushButton_2.clicked.connect(self.export_preview)
         # browse to select a file
         self.pushButton_8.clicked.connect(self.select_hdf5_file)
         # auto update custom scan dimensions (spinbox 16)
@@ -107,7 +91,20 @@ class ConnectedWidget(rawgui):
         self.checkBox_2.stateChanged.connect(self.update_final_frame)
         # create a preview of the vbf
         self.pushButton_10.clicked.connect(self.update_vbf)
+        # connecting the horizontal sliders
+        self.horizontalSlider.sliderReleased.connect(self.update_levels_vbf)
+        self.horizontalSlider_2.sliderReleased.connect(self.update_levels_vbf)
+        # saving the VBF
+        self.pushButton_7.clicked.connect(self.export_vbf)
         # # deactivate part of the gui upon activation
+        # browsing blo file
+        self.pushButton_9.clicked.connect(self.get_blo_path)
+        # start blo conversion
+        self.pushButton_5.clicked.connect(self.write_to_blo)
+        # select tiff file
+        self.pushButton_12.clicked.connect(self.get_tiff_path)
+        # export tiff files
+        self.pushButton_11.clicked.connect(self.export_tiffs)
         # self.checkBox_8.stateChanged.connect(self.updateActive)
         # self.checkBox_3.stateChanged.connect(self.updateActive)
         # self.checkBox_7.stateChanged.connect(self.updateActive)
@@ -115,6 +112,54 @@ class ConnectedWidget(rawgui):
         # self.checkBox_4.stateChanged.connect(self.updateActive)
         # self.checkBox_6.stateChanged.connect(self.updateActive)
         # self.updateActive()
+
+    def export_preview(self):
+        try:
+            if self.fig_prev is None:
+                raise Exception("Must first create preview")
+            path = self.saveFileBrowser("PNG (*.png)")
+            if path is None:
+                raise Exception("No valid file selected")
+            self.fig_prev.savefig(path)
+            self.update_line(self.statusedit, f"Succesfully saved preview.")
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
+
+    def export_vbf(self):
+        try:
+            if self.fig_vbf is None:
+                raise Exception("Must first create VBF preview")
+            path = self.saveFileBrowser("PNG (*.png)")
+            if path is None:
+                raise Exception("No valid file selected")
+            self.fig_vbf.savefig(path)
+            self.update_line(self.statusedit, f"Succesfully saved VBF.")
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
+
+    def update_levels_vbf(self):
+        if self.vbf_data is not None:
+            vmin = self.horizontalSlider.value()
+            vmax = self.horizontalSlider_2.value()
+            mn = self.vbf_data.min()
+            mx = self.vbf_data.max()
+            unit = (mx-mn)/100
+            climmin = mn+vmin*unit
+            climmax = mn+(vmax+1)*unit
+            try:
+                self.vbf_im.set_clim(climmin, climmax)
+                canvas = FigureCanvas(self.fig_vbf)
+                canvas.draw()
+                scene = QGraphicsScene()
+                scene.addWidget(canvas)
+                self.graphicsView_3.setScene(scene)
+                self.graphicsView_3.fitInView(scene.sceneRect())
+                self.repaint_widget(self.graphicsView_3)
+            except Exception as e:
+                logger.debug(f"Error: {e}")
+
+    def save_vbf_to_hdf5(self):
+        pass
 
     def update_final_frame(self):
         if self.checkBox_2.checkState():
@@ -304,6 +349,26 @@ class ConnectedWidget(rawgui):
         except Exception as e:
             self.update_line(self.statusedit, f"Error: {e}")
 
+    def get_blo_path(self):
+        # open a savefile browser
+        try:
+            self.oupath = self.saveFileBrowser("BLO (*.blo)")
+            if not self.oupath:
+                raise Exception("No valid BLO file path selected")
+            self.lineEdit_7.setText(self.oupath)
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
+
+    def get_tiff_path(self):
+        # open a savefile browser
+        try:
+            self.oupath = self.saveFileBrowser("tiff (*.tiff)")
+            if not self.oupath:
+                raise Exception("No valid tiff file path selected")
+            self.lineEdit_9.setText(self.oupath)
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
+
     def done(self):
         self.window.setEnabled(True)
 
@@ -439,12 +504,109 @@ class ConnectedWidget(rawgui):
             self.graphicsView_3.setScene(scene)
             self.graphicsView_3.fitInView(scene.sceneRect())
             self.repaint_widget(self.graphicsView_3)
+            self.update_levels_vbf()
             self.update_line(self.statusedit, "Succesfully created VBF.")
             yshap, xshap = self.vbf_data.shape
             self.update_line(self.lineEdit_10, f"Size: {xshap}x{yshap}.")
             f.close()
         except Exception as e:
             self.update_line(self.statusedit, f"Error: {e}")
+
+    def write_to_blo(self):
+        """Export the file to blo in an incremental way"""
+        path_hdf5 = self.lineEdit_4.text()
+        path_blo = self.lineEdit_7.text()
+        try:
+            # check if an hdf5 file is selected
+            if not path_hdf5:
+                raise Exception("No valid HDF5 file selected!")
+            if not path_blo:
+                raise Exception("No valid blo file selected!")
+            # try to read the info from the file
+            f = rec.hdf5Intermediate(path_hdf5)
+            # none or 0 means default
+            start_frame = None
+            end_frame = None
+            sdimx = None
+            sdimy = None
+            hyst = 0
+            # overwrite standard info depending on gui
+            if self.checkBox_2.checkState():
+                # use custom scanning
+                sdimx = self.spinBox.value()
+                sdimy = self.spinBox_2.value()
+            if self.checkBox_11.checkState():
+                # use custom frames
+                start_frame = self.spinBox_15.value()
+                end_frame = self.spinBox_16.value()
+            # use hysteresis or not
+            if self.checkBox_6.checkState():
+                hyst = self.spinBox_9.value()
+            # calculate the image
+            logger.debug(f"We try to create a blo file with data: "
+                         f"S.F. {start_frame}, E.F. {end_frame}, "
+                         f"Dims: x {sdimx} y {sdimy},"
+                         f"hyst: {hyst}")
+            logger.debug("Calculating shape and indexes")
+            shape, indexes = f.get_blo_export_data(sdimx, sdimy,
+                                                   start_frame,
+                                                   end_frame, hyst)
+            logger.debug(f"Shape: {shape}")
+            logger.debug(f"Starting to write blo file")
+            self.update_line(self.statusedit, "Writing blo file...")
+            self.get_thread = blf.bloFileWriter(f, path_blo, shape, indexes)
+            self.get_thread.increase_progress.connect(self.increase_progbar)
+            self.get_thread.finish.connect(self.done_bloexport)
+            self.get_thread.start()
+            self.window.setEnabled(False)
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
+
+    def done_bloexport(self):
+        self.window.setEnabled(True)
+        # also update lines in the second pannel
+        self.update_line(self.statusedit,
+                         f"Succesfully exported to blo")
+
+    def export_tiffs(self):
+        path_hdf5 = self.lineEdit_4.text()
+        path_tiff = self.lineEdit_9.text()
+        try:
+            # check if an hdf5 file is selected
+            if not path_hdf5:
+                raise Exception("No valid HDF5 file selected!")
+            if not path_tiff:
+                raise Exception("No valid tiff file path selected!")
+            pre, fin = os.path.splitext(path_tiff)
+
+            f = rec.hdf5Intermediate(path_hdf5)
+            tot_frames = f["Scan"].attrs["total_stream_frames"]
+            first_frame = self.spinBox_5.value()
+            last_frame = self.spinBox_4.value()
+            dtype = self.comboBox_2.currentText()
+            if dtype == "uint8":
+                dtype = np.uint8
+            elif dtype == "uint16":
+                dtype = np.uint16
+            else:
+                raise Exception("Unexpected dtype")
+            if tot_frames <= last_frame:
+                raise Exception("Frames are out of range")
+            frames = np.arange(first_frame, last_frame+1)
+            self.update_line(self.statusedit, f"Exporting to tiff files...")
+            self.get_thread = tfe.TiffFileWriter(f, frames, dtype, pre, fin)
+            self.get_thread.increase_progress.connect(self.increase_progbar)
+            self.get_thread.finish.connect(self.done_tiffexport)
+            self.get_thread.start()
+            self.window.setEnabled(False)
+        except Exception as e:
+            self.update_line(self.statusedit, f"Error: {e}")
+
+    def done_tiffexport(self):
+        self.window.setEnabled(True)
+        # also update lines in the second pannel
+        self.update_line(self.statusedit,
+                         f"Succesfully exported Tiff files")
 
     def increase_progbar(self, value):
         self.progressBar.setValue(value)
@@ -457,28 +619,12 @@ class ConnectedWidget(rawgui):
 def main():
     app = QApplication([])
     window = Window()
-    form = ConnectedWidget(window)
+    _ = ConnectedWidget(window)
     window.setWindowTitle("TVIPS converter")
     window.show()
-    form.lineEdit.setText("/Volumes/Elements/200309-2F/"
-                          "rec_20200309_113857_000.tvips")
-    form.lineEdit_2.setText("/Users/nielscautaerts/Desktop/stream_2.hdf5")
-    app.exec_()
-
-
-def mainDebug():
-    app = QApplication([])
-    window = Window()
-    form = ConnectedWidget(window)
-    window.setWindowTitle("TVIPS / blo converter")
-    window.show()
-    # set the values
-    form.lineEdit.setText("./Dummy/rec_20190412_183600_000.tvips")
-    form.spinBox.setValue(150)
-    form.spinBox_2.setValue(1)
-    form.lineEdit_2.setText("./Dummy")
-    form.lineEdit_3.setText("testpref")
-    form.comboBox.setCurrentIndex(1)
+    # form.lineEdit.setText("/Volumes/Elements/200309-2F/"
+    #                       "rec_20200309_113857_000.tvips")
+    # form.lineEdit_2.setText("/Users/nielscautaerts/Desktop/stream_2.hdf5")
     app.exec_()
 
 

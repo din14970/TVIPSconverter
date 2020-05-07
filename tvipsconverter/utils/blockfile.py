@@ -29,6 +29,10 @@ from . import imagefun
 
 from collections import OrderedDict
 
+from PyQt5.QtCore import QThread, pyqtSignal
+
+logger = logging.getLogger(__name__)
+
 
 def sarray2dict(sarray, dictionary=None):
     """Converts a struct array to an ordered dictionary
@@ -427,6 +431,85 @@ def file_writer(filename, signal, **kwds):
             dp_head.tofile(f)
             img.astype(endianess + 'u1').tofile(f)
             dp_head['ID'] += 1
+
+
+class bloFileWriter(QThread):
+    """Write a blo file from an HDF5 without loading all data in memory"""
+    increase_progress = pyqtSignal(int)
+    finish = pyqtSignal()
+
+    def __init__(self, fh, path_blo, shape, indexes):
+        QThread.__init__(self)
+        self.fh = fh  # open hdf5 file in read mode
+        self.path_blo = path_blo
+        self.shape = shape  # shape of hypercube
+        self.indexes = indexes  # indexes: right order of frames
+        # scale seems unknown and arbitrarily determined in original code
+        self.scan_scale = 5  # TODO can this be extracted from the TVIPS meta?
+        self.diff_scale = 1.075  # TODO can this be extracted from TVIPS meta?
+        vbfs = self.fh["Scan"]["vbf_intensities"][:]
+        self.vbf_im = vbfs[self.indexes].reshape(self.shape[0], self.shape[1])
+        self.vbf_im = imagefun.normalize_convert(self.vbf_im, dtype=np.uint8)
+        logger.debug("Initialized bloFileWriter")
+
+    def run(self):
+        self.convert_to_blo()
+        self.finish.emit()
+        self.fh.close()  # close the hdf5 file
+
+    def convert_to_blo(self):
+        endianess = "<"
+        header, note = get_header(
+            self.shape, self.scan_scale,
+            self.diff_scale, endianess,
+            Camera_length=100.0*self.fh["ImageStream"].attrs['magtotal'],
+            Beam_energy=self.fh["ImageStream"].attrs['ht']*1000,
+            Distortion_N01=1.0, Distortion_N09=1.0,
+            Note="Reconstructed from TVIPS image stream")
+
+        logger.debug("Created header of blo file")
+        with open(self.path_blo, "wb") as f:
+            # Write header
+            header.tofile(f)
+            logger.debug("Wrote header to file")
+            # Write header note field:
+            if len(note) > int(header['Data_offset_1']) - f.tell():
+                note = note[:int(header['Data_offset_1']) -
+                            f.tell() - len(note)]
+            f.write(note.encode())
+            # Zero pad until next data block
+            zero_pad = int(header['Data_offset_1']) - f.tell()
+            np.zeros((zero_pad,), np.byte).tofile(f)
+            # Write virtual bright field
+            vbf = self.vbf_im.astype(endianess + "u1")
+            vbf.tofile(f)
+            # Zero pad until next data block
+            if f.tell() > int(header['Data_offset_2']):
+                raise ValueError("Signal navigation size does not match "
+                                 "data dimensions.")
+            zero_pad = int(header['Data_offset_2']) - f.tell()
+            np.zeros((zero_pad,), np.byte).tofile(f)
+            # Write full data stack:
+            # We need to pad each image with magic 'AA55', then a u32 serial
+            dp_head = np.zeros((1,), dtype=[('MAGIC', endianess + 'u2'),
+                                            ('ID', endianess + 'u4')])
+            dp_head['MAGIC'] = 0x55AA
+            # Write by loop:
+            logger.debug("Wrote header part of blo file")
+            for j, indx in enumerate(self.indexes):
+                dp_head.tofile(f)
+                c = f"{indx}".zfill(6)
+                img = self.fh["ImageStream"][f"Frame_{c}"][:]
+                img = imagefun.normalize_convert(img, dtype=np.uint8)
+                img.astype(endianess + 'u1').tofile(f)
+                dp_head['ID'] += 1
+                self.update_gui_progress(j)
+                logger.debug(f"Wrote frame Frame_{c} to blo file")
+
+    def update_gui_progress(self, j):
+        """If using the GUI update features with progress"""
+        value = int((j+1)/len(self.indexes)*100)
+        self.increase_progress.emit(value)
 
 
 def file_writer_array(filename, array, scan_scale, diff_scale, **kwds):

@@ -161,18 +161,18 @@ def medfilter(arr, ks):
     return median_filter(arr, size=ks, mode="constant", cval=0)
 
 
-def scalestd(raw, numstd=3):
-    # scaling n/2 std dev around image mean
-    mean = np.mean(raw)
-    std = np.std(raw)
-    nstd = numstd*std
-    return scale16to8(raw, mean - nstd, mean + nstd)
+# def scalestd(raw, numstd=3):
+#     # scaling n/2 std dev around image mean
+#     mean = np.mean(raw)
+#     std = np.std(raw)
+#     nstd = numstd*std
+#     return scale16to8(raw, mean - nstd, mean + nstd)
 
 
-def scalepercent(raw, percent=0.07):
-    # suppresses outliers in min/max
-    minval, maxval = findoutliers(raw, percent)
-    return scale16to8(raw, minval, maxval)
+# def scalepercent(raw, percent=0.07):
+#     # suppresses outliers in min/max
+#     minval, maxval = findoutliers(raw, percent)
+#     return scale16to8(raw, minval, maxval)
 
 
 def findoutliers(raw, percent=0.07):
