@@ -503,7 +503,7 @@ class hdf5Intermediate(h5py.File):
             else:
                 dim = int(dim)
         except Exception:
-            logger.debug(f"Could not calculate scan dimensions")
+            logger.debug("Could not calculate scan dimensions")
             dim = None
         try:
             imdimx, imdimy = self["ImageStream"]["Frame_000000"].shape
@@ -513,7 +513,7 @@ class hdf5Intermediate(h5py.File):
         return (tot, start, end, finrot, dim, imdimx, imdimy)
 
     def get_vbf_image(self, sdimx=None, sdimy=None, start_frame=None,
-                      end_frame=None, hyst=0):
+                      end_frame=None, hyst=0, snakescan=True):
         # try to get the rotator data
         try:
             vbfs = self["Scan"]["vbf_intensities"][:]
@@ -524,7 +524,7 @@ class hdf5Intermediate(h5py.File):
         logger.debug("Now calculating scan indexes")
         scan_indexes = self.calculate_scan_export_indexes(
             sdimx=sdimx, sdimy=sdimy, start_frame=start_frame,
-            end_frame=end_frame, hyst=hyst)
+            end_frame=end_frame, hyst=hyst, snakescan=snakescan)
         logger.debug("Calculated scan indexes")
         if sdimx is None:
             sdimx = self.sdimx
@@ -535,10 +535,10 @@ class hdf5Intermediate(h5py.File):
         return img
 
     def get_blo_export_data(self, sdimx=None, sdimy=None, start_frame=None,
-                            end_frame=None, hyst=0):
+                            end_frame=None, hyst=0, snakescan=True):
         scan_indexes = self.calculate_scan_export_indexes(
             sdimx=sdimx, sdimy=sdimy, start_frame=start_frame,
-            end_frame=end_frame, hyst=hyst)
+            end_frame=end_frame, hyst=hyst, snakescan=snakescan)
         logger.debug("Calculated scan indexes")
         if sdimx is None:
             sdimx = self.sdimx
@@ -553,7 +553,7 @@ class hdf5Intermediate(h5py.File):
 
     def calculate_scan_export_indexes(self, sdimx=None, sdimy=None,
                                       start_frame=None, end_frame=None,
-                                      hyst=0):
+                                      hyst=0, snakescan=True):
         """Calculate the indexes of the list of frames to consider for the
         scan or VBF"""
         try:
@@ -586,7 +586,8 @@ class hdf5Intermediate(h5py.File):
             sel = np.arange(start_frame, end_frame+1)
             sel = sel.reshape(sdimy, sdimx)
             # reverse correct even scan lines
-            sel[::2] = sel[::2][:, ::-1]
+            if snakescan:
+                sel[::2] = sel[::2][:, ::-1]
             # hysteresis correction on even scan lines
             sel[::2] = np.roll(sel[::2], hyst, axis=1)
             return sel.ravel()
@@ -624,87 +625,9 @@ class hdf5Intermediate(h5py.File):
             # just an array of indexes
             img = indxs.reshape(sdimy, sdimx)
             # reverse correct even scan lines
-            img[::2] = img[::2][:, ::-1]
+            if snakescan:
+                img[::2] = img[::2][:, ::-1]
             # hysteresis correction on even scan lines
             img[::2] = np.roll(img[::2], hyst, axis=1)
             # add the start index
             return img.ravel()+self.start_frame
-
-# class OutputTypes(Enum):
-#     IndividualTiff = "Individual"
-#     TiffStack = "TiffStack"
-#     TestFile = "TestFile"
-#     Blockfile = "blo"
-#     VirtualBF = "VirtualBF"
-#
-#     def __str__(self):
-#         return self.value
-
-
-# def main(opts):
-#     """Main function that runs the transform depending on options"""
-#     logger.debug(str(opts))
-#
-#     # read in file
-#     assert (os.path.exists(opts.input))
-#
-#     # read tvips file
-#     # default numframes is none
-#     rec = Recorder(opts)
-#
-#     if (opts.depth is not None):
-#         dtype = np.dtype(opts.depth)  # parse dtype
-#         logger.debug("Mapping data to {}...".format(opts.depth))
-#         rec.frames = rec.frames.astype(dtype)
-#         logger.debug("Done Mapping")
-#
-#     if (opts.otype == str(OutputTypes.IndividualTiff)):
-#         numframes = len(rec.frames)
-#         amount_of_digits = len(str(numframes-1))
-#
-#         print("Start writing individual tif files to {}".format(opts.output))
-#         if not os.path.exists(opts.output):
-#             os.mkdir(opts.output)
-#
-#         filename = "{}_{:0" + str(amount_of_digits) + "d}.tif"
-#         filename = os.path.join(opts.output, filename)
-#
-#         for i, frame in enumerate(rec.frames):
-#             logger.info("Writing file {}".format(i))
-#             tifffile.imsave(filename.format(opts.fprefix, i), frame)
-#             logger.info("Finished writing file {}".format(i))
-#
-#     elif (opts.otype == str(OutputTypes.TiffStack)):
-#         tifffile.imsave(opts.output, rec.toarray())
-#
-#     elif (opts.otype == str(OutputTypes.TestFile)):
-#         tifffile.imsave(opts.output, rec.frames[0])
-#         logger.info("Wrote the test file")
-#
-#     elif (opts.otype == str(OutputTypes.Blockfile) or
-#           opts.otype == OutputTypes.Blockfile):
-#         from . import blockfile
-#         xdim, ydim = determine_recorder_image_dimension()
-#
-#         gc.collect()  # garbage collector
-#         arr = rec.frames
-#
-#         logger.debug("The frames are: {}".format(type(arr)))
-#         logger.debug("The x and ydim: {}x{}".format(xdim, ydim))
-#         if (len(arr) != xdim * ydim):
-#             # extend it to the requested dimensions
-#             missing = xdim*ydim - len(arr)
-#             arr = np.concatenate((arr, missing * [np.zeros_like(arr[0]), ]))
-#             logger.info("Data set filled up with {} frames for "
-#                         "matching requested dimensions".format(missing))
-#         arr.shape = (xdim, ydim, *arr[0].shape)
-#
-#         blockfile.file_writer_array(
-#                 opts.output, arr, 5, 1.075,
-#                 Camera_length=100.0*rec.general['magtotal'],
-#                 Beam_energy=rec.general['ht']*1000,
-#                 Distortion_N01=1.0, Distortion_N09=1.0,
-#                 Note="Cheers from TVIPS!")
-#         logger.debug("Finished writing the blo file")
-#     else:
-#         raise ValueError("No output type specified (--otype)")

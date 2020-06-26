@@ -123,7 +123,7 @@ class ConnectedWidget(rawgui):
             if path is None:
                 raise Exception("No valid file selected")
             self.fig_prev.savefig(path)
-            self.update_line(self.statusedit, f"Succesfully saved preview.")
+            self.update_line(self.statusedit, "Succesfully saved preview.")
         except Exception as e:
             self.update_line(self.statusedit, f"Error: {e}")
 
@@ -135,7 +135,7 @@ class ConnectedWidget(rawgui):
             if path is None:
                 raise Exception("No valid file selected")
             self.fig_vbf.savefig(path)
-            self.update_line(self.statusedit, f"Succesfully saved VBF.")
+            self.update_line(self.statusedit, "Succesfully saved VBF.")
         except Exception as e:
             self.update_line(self.statusedit, f"Error: {e}")
 
@@ -404,7 +404,7 @@ class ConnectedWidget(rawgui):
         self.window.setEnabled(True)
         # also update lines in the second pannel
         self.update_line(self.statusedit,
-                         f"Succesfully exported to HDF5")
+                         "Succesfully exported to HDF5")
         # don't auto update, the gui may be before the file exists
         # self.update_line(self.lineEdit_4, self.lineEdit_2.text())
 
@@ -462,6 +462,7 @@ class ConnectedWidget(rawgui):
             sdimx = None
             sdimy = None
             hyst = 0
+            snakescan = True
             # overwrite standard info depending on gui
             if self.checkBox_2.checkState():
                 # use custom scanning
@@ -474,20 +475,26 @@ class ConnectedWidget(rawgui):
             # use hysteresis or not
             if self.checkBox_6.checkState():
                 hyst = self.spinBox_9.value()
+            # use snake scan or not
+            if self.checkBox_12.checkState():
+                snakescan = True
+            else:
+                snakescan = False
             # calculate the image
             logger.debug(f"We try to create a VBF image with data: "
                          f"S.F. {start_frame}, E.F. {end_frame}, "
                          f"Dims: x {sdimx} y {sdimy},"
                          f"hyst: {hyst}")
             self.vbf_data = f.get_vbf_image(sdimx, sdimy, start_frame,
-                                            end_frame, hyst)
+                                            end_frame, hyst, snakescan)
             logger.debug("Succesfully created the VBF array")
             # save the settings for later storage
             self.vbf_sets = {"start_frame": start_frame,
                              "end_frame": end_frame,
                              "scan_dim_x": sdimx,
                              "scan_dim_y": sdimy,
-                             "hysteresis": hyst}
+                             "hysteresis": hyst,
+                             "winding_scan": snakescan}
             # plot the image and store it for further use. First close prior
             # image
             if self.fig_vbf is not None:
@@ -532,6 +539,7 @@ class ConnectedWidget(rawgui):
             sdimx = None
             sdimy = None
             hyst = 0
+            snakescan = True
             # overwrite standard info depending on gui
             if self.checkBox_2.checkState():
                 # use custom scanning
@@ -544,17 +552,22 @@ class ConnectedWidget(rawgui):
             # use hysteresis or not
             if self.checkBox_6.checkState():
                 hyst = self.spinBox_9.value()
+            # use snake scan or not
+            if self.checkBox_12.checkState():
+                snakescan = True
+            else:
+                snakescan = False
             # calculate the image
             logger.debug(f"We try to create a blo file with data: "
                          f"S.F. {start_frame}, E.F. {end_frame}, "
                          f"Dims: x {sdimx} y {sdimy},"
-                         f"hyst: {hyst}")
+                         f"hyst: {hyst}, snakescan: {snakescan}")
             logger.debug("Calculating shape and indexes")
             shape, indexes = f.get_blo_export_data(sdimx, sdimy,
                                                    start_frame,
-                                                   end_frame, hyst)
+                                                   end_frame, hyst, snakescan)
             logger.debug(f"Shape: {shape}")
-            logger.debug(f"Starting to write blo file")
+            logger.debug("Starting to write blo file")
             self.update_line(self.statusedit, "Writing blo file...")
             self.get_thread = blf.bloFileWriter(f, path_blo, shape, indexes)
             self.get_thread.increase_progress.connect(self.increase_progbar)
@@ -568,7 +581,7 @@ class ConnectedWidget(rawgui):
         self.window.setEnabled(True)
         # also update lines in the second pannel
         self.update_line(self.statusedit,
-                         f"Succesfully exported to blo")
+                         "Succesfully exported to blo")
 
     def export_tiffs(self):
         path_hdf5 = self.lineEdit_4.text()
@@ -595,7 +608,7 @@ class ConnectedWidget(rawgui):
             if tot_frames <= last_frame:
                 raise Exception("Frames are out of range")
             frames = np.arange(first_frame, last_frame+1)
-            self.update_line(self.statusedit, f"Exporting to tiff files...")
+            self.update_line(self.statusedit, "Exporting to tiff files...")
             self.get_thread = tfe.TiffFileWriter(f, frames, dtype, pre, fin)
             self.get_thread.increase_progress.connect(self.increase_progbar)
             self.get_thread.finish.connect(self.done_tiffexport)
@@ -608,7 +621,7 @@ class ConnectedWidget(rawgui):
         self.window.setEnabled(True)
         # also update lines in the second pannel
         self.update_line(self.statusedit,
-                         f"Succesfully exported Tiff files")
+                         "Succesfully exported Tiff files")
 
     def increase_progbar(self, value):
         self.progressBar.setValue(value)

@@ -73,3 +73,9 @@ This tool is not an official product of the TVIPS company. However it is built o
 originally developed by the company. We have significantly modified these
 scripts mainly to make the conversion process possible on a computer with regular sized RAM by
 working with an intermediate HDF5 file. The GUI is also our addition.
+
+## Changelog
+
+### 0.0.7
+
+* added support for EM-Scan data where scanning doesn't follow snake pattern
