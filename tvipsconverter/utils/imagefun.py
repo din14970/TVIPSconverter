@@ -161,20 +161,6 @@ def medfilter(arr, ks):
     return median_filter(arr, size=ks, mode="constant", cval=0)
 
 
-# def scalestd(raw, numstd=3):
-#     # scaling n/2 std dev around image mean
-#     mean = np.mean(raw)
-#     std = np.std(raw)
-#     nstd = numstd*std
-#     return scale16to8(raw, mean - nstd, mean + nstd)
-
-
-# def scalepercent(raw, percent=0.07):
-#     # suppresses outliers in min/max
-#     minval, maxval = findoutliers(raw, percent)
-#     return scale16to8(raw, minval, maxval)
-
-
 def findoutliers(raw, percent=0.07):
     """
     findoutliers (array, percent=0.07)
@@ -197,15 +183,17 @@ def suppressoutliers(raw, percent=0.07):
 
     raw[raw < min] = min
     raw[raw > max] = max
-
     return raw
 
 
 def bin2(a, factor):
     assert len(a.shape) == 2
-    # binned = imresize(a, (a.shape[0]//factor, a.shape[1]//factor))
-    binned = np.array(Image.fromarray(a).resize(
-        size=(a.shape[0]//factor, a.shape[1]//factor)))
+    imag = Image.fromarray(a)
+    binned = Image.resize(imag, (a.shape[0]//factor, a.shape[1]//factor),
+                          resample=Image.BILINEAR)
+    # binned = np.array(imag.resize((a.shape[0]//factor, a.shape[1]//factor),
+    #                   resample=Image.NEAREST))
+    print(binned.dtype)
     return binned
 
 
