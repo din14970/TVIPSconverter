@@ -79,3 +79,4 @@ working with an intermediate HDF5 file. The GUI is also our addition.
 ### 0.0.7
 
 * added support for EM-Scan data where scanning doesn't follow snake pattern
+* fixed some bugs
