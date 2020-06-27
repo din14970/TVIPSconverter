@@ -244,7 +244,7 @@ def get_header(data_shape, scan_scale, diff_scale, endianess="<", **kwargs):
     header = get_default_header(endianess)
     note = ''
     if len(data_shape) == 4:
-        NX, NY = data_shape[:2][::-1]  # first dimension seems to by y in np
+        NY, NX = data_shape[:2][::-1]  # first dimension seems to by y in np
         SX = scan_scale
         SY = scan_scale
     elif len(data_shape) == 3:
