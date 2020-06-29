@@ -5,7 +5,7 @@ with open("README.md") as f:
 
 setup(
     name="tvipsconverter",
-    version="0.0.7",
+    version="0.0.8",
     description=("GUI converter for data from TVIPS cameras into .blo mainly"
                  " for orientation mapping (PED) or 4D STEM."),
     url='https://github.com/din14970/TVIPSconverter',
