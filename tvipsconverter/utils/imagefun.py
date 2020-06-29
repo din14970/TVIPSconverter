@@ -189,10 +189,10 @@ def suppressoutliers(raw, percent=0.07):
 def bin2(a, factor):
     assert len(a.shape) == 2
     imag = Image.fromarray(a)
-    binned = Image.resize(imag, (a.shape[0]//factor, a.shape[1]//factor),
-                          resample=Image.BILINEAR)
-    # binned = np.array(imag.resize((a.shape[0]//factor, a.shape[1]//factor),
-    #                   resample=Image.NEAREST))
+    # binned = Image.resize(imag, (a.shape[0]//factor, a.shape[1]//factor),
+    #                       resample=Image.BILINEAR)
+    binned = np.array(imag.resize((a.shape[0]//factor, a.shape[1]//factor),
+                      resample=Image.NEAREST))
     print(binned.dtype)
     return binned
 
