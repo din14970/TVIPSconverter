@@ -1,5 +1,8 @@
 # TVIPS converter
 
+## Cite TVIPS converter
+[![DOI](https://zenodo.org/badge/228454716.svg)](https://zenodo.org/badge/latestdoi/228454716)
+
 ## What does it do?
 
 This tool with a Qt user interface serves to convert .tvips movie files from TVIPS CCD/CMOS cameras into more convenient formats. These kinds of cameras may be found in transmission electron microscopes (TEM) and are used for recording precession electron diffraction (PED) and 4D-STEM data, as well as in-situ experiment recordings. To analyze the data with 3rd party tools, the tvips data format is highly inconvenient; this tool aims to alleviate this issue.
