@@ -5,9 +5,11 @@ with open("README.md") as f:
 
 setup(
     name="tvipsconverter",
-    version="0.0.8",
-    description=("GUI converter for data from TVIPS cameras into .blo mainly"
-                 " for orientation mapping (PED) or 4D STEM."),
+    version="0.1.0",
+    description=(
+        "GUI converter for movie data from TVIPS cameras"
+        "into other formats like .blo, .tiff and .hspy."
+        "Mainly for orientation mapping (PED) or 4D STEM experiments."),
     url='https://github.com/din14970/TVIPSconverter',
     author='Niels Cautaerts',
     author_email='nielscautaerts@hotmail.com',
