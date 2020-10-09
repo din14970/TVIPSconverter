@@ -1,6 +1,7 @@
 from PyQt5 import uic
 from PyQt5.QtWidgets import (QApplication, QFileDialog, QGraphicsScene)
 from PyQt5.QtCore import QThread, pyqtSignal
+# from PyQt5.QtCore import Qt
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
@@ -15,6 +16,7 @@ import os
 from .utils import recorder as rec
 from .utils import blockfile as blf
 from .utils import tiffexport as tfe
+from .utils import hspy as hspf
 
 logging.basicConfig(level=logging.DEBUG)
 sys.path.append(".")
@@ -102,18 +104,11 @@ class ConnectedWidget(rawgui):
         # browsing blo file
         self.pushButton_9.clicked.connect(self.get_blo_path)
         # start blo conversion
-        self.pushButton_5.clicked.connect(self.write_to_blo)
+        self.pushButton_5.clicked.connect(self.write_to_file)
         # select tiff file
         self.pushButton_12.clicked.connect(self.get_tiff_path)
         # export tiff files
         self.pushButton_11.clicked.connect(self.export_tiffs)
-        # self.checkBox_8.stateChanged.connect(self.updateActive)
-        # self.checkBox_3.stateChanged.connect(self.updateActive)
-        # self.checkBox_7.stateChanged.connect(self.updateActive)
-        # self.checkBox_5.stateChanged.connect(self.updateActive)
-        # self.checkBox_4.stateChanged.connect(self.updateActive)
-        # self.checkBox_6.stateChanged.connect(self.updateActive)
-        # self.updateActive()
 
     def export_preview(self):
         try:
@@ -155,7 +150,9 @@ class ConnectedWidget(rawgui):
                 scene = QGraphicsScene()
                 scene.addWidget(canvas)
                 self.graphicsView_3.setScene(scene)
-                self.graphicsView_3.fitInView(scene.sceneRect())
+                self.graphicsView_3.fitInView(
+                        scene.sceneRect(),
+                        )
                 self.repaint_widget(self.graphicsView_3)
             except Exception as e:
                 logger.debug(f"Error: {e}")
@@ -247,6 +244,7 @@ class ConnectedWidget(rawgui):
         """Read the first image from the file and create a preview"""
         # read the gui info
         path, improc, vbfsettings = self.read_modsettings()
+        framenum = self.spinBox_17.value()
         # create one image properly processed
         try:
             if not path:
@@ -254,11 +252,13 @@ class ConnectedWidget(rawgui):
             # get and calculate the image. Also get old image and new image
             # size. only change original image if there is none or the path
             # has changed
-            if (self.original_preview is None) or (self.path_preview != path):
-                self.update_line(self.statusedit, "Extracting frame...")
-                self.original_preview = rec.getOriginalPreviewImage(
-                                                path, improc=improc,
-                                                vbfsettings=vbfsettings)
+            # if (self.original_preview is None) or
+            # (self.path_preview != path):
+            self.update_line(self.statusedit, "Extracting frame...")
+            self.original_preview = rec.getOriginalPreviewImage(
+                                            path, improc=improc,
+                                            vbfsettings=vbfsettings,
+                                            frame=framenum)
             # update the path
             self.path_preview = path
             ois = self.original_preview.shape
@@ -354,7 +354,13 @@ class ConnectedWidget(rawgui):
     def get_blo_path(self):
         # open a savefile browser
         try:
-            self.oupath = self.saveFileBrowser("BLO (*.blo)")
+            filetype = self.comboBox.currentText()
+            if ".blo" == filetype:
+                self.oupath = self.saveFileBrowser("BLO (*.blo)")
+            elif ".hspy" == filetype:
+                self.oupath = self.saveFileBrowser("HSPY (*.hspy)")
+            else:
+                raise ValueError("Unrecognized filetype")
             if not self.oupath:
                 raise Exception("No valid BLO file path selected")
             self.lineEdit_7.setText(self.oupath)
@@ -521,8 +527,8 @@ class ConnectedWidget(rawgui):
         except Exception as e:
             self.update_line(self.statusedit, f"Error: {e}")
 
-    def write_to_blo(self):
-        """Export the file to blo in an incremental way"""
+    def write_to_file(self):
+        """Export the data to a specific file format in an incremental way"""
         path_hdf5 = self.lineEdit_4.text()
         path_blo = self.lineEdit_7.text()
         try:
@@ -530,7 +536,7 @@ class ConnectedWidget(rawgui):
             if not path_hdf5:
                 raise Exception("No valid HDF5 file selected!")
             if not path_blo:
-                raise Exception("No valid blo file selected!")
+                raise Exception("No valid export file path selected!")
             # try to read the info from the file
             f = rec.hdf5Intermediate(path_hdf5)
             # none or 0 means default
@@ -539,7 +545,7 @@ class ConnectedWidget(rawgui):
             sdimx = None
             sdimy = None
             hyst = 0
-            snakescan = True
+            snakescan = False
             # overwrite standard info depending on gui
             if self.checkBox_2.checkState():
                 # use custom scanning
@@ -557,8 +563,12 @@ class ConnectedWidget(rawgui):
                 snakescan = True
             else:
                 snakescan = False
+            # we set the scale of scan and dp
+            scan_scale = self.doubleSpinBox_2.value()
+            dp_scale = self.doubleSpinBox_3.value()
             # calculate the image
-            logger.debug(f"We try to create a blo file with data: "
+            filetyp = self.comboBox.currentText()
+            logger.debug(f"We try to create a {filetyp} file with data: "
                          f"S.F. {start_frame}, E.F. {end_frame}, "
                          f"Dims: x {sdimx} y {sdimy},"
                          f"hyst: {hyst}, snakescan: {snakescan}")
@@ -567,9 +577,16 @@ class ConnectedWidget(rawgui):
                                                    start_frame,
                                                    end_frame, hyst, snakescan)
             logger.debug(f"Shape: {shape}")
-            logger.debug("Starting to write blo file")
-            self.update_line(self.statusedit, "Writing blo file...")
-            self.get_thread = blf.bloFileWriter(f, path_blo, shape, indexes)
+            logger.debug(f"Starting to write {filetyp} file")
+            self.update_line(self.statusedit, f"Writing {filetyp} file...")
+            if filetyp == ".blo":
+                self.get_thread = blf.bloFileWriter(
+                        f, path_blo, shape, indexes, scan_scale, dp_scale)
+            elif filetyp == ".hspy":
+                self.get_thread = hspf.hspyFileWriter(
+                        f, path_blo, shape, indexes, scan_scale, dp_scale)
+            else:
+                raise NotImplementedError("Unrecognized file type")
             self.get_thread.increase_progress.connect(self.increase_progbar)
             self.get_thread.finish.connect(self.done_bloexport)
             self.get_thread.start()
@@ -581,7 +598,7 @@ class ConnectedWidget(rawgui):
         self.window.setEnabled(True)
         # also update lines in the second pannel
         self.update_line(self.statusedit,
-                         "Succesfully exported to blo")
+                         "Succesfully exported to file")
 
     def export_tiffs(self):
         path_hdf5 = self.lineEdit_4.text()
@@ -637,9 +654,6 @@ def main():
     _ = ConnectedWidget(window)
     window.setWindowTitle("TVIPS converter")
     window.show()
-    # form.lineEdit.setText("/Volumes/Elements/200309-2F/"
-    #                       "rec_20200309_113857_000.tvips")
-    # form.lineEdit_2.setText("/Users/nielscautaerts/Desktop/stream_2.hdf5")
     app.exec_()
 
 

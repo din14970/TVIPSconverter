@@ -121,9 +121,10 @@ def filter_image(imag, useint, whichint, usebin,
     return imag
 
 
-def getOriginalPreviewImage(path, improc, vbfsettings):
+def getOriginalPreviewImage(path, improc, vbfsettings, frame=0):
     rec = Recorder(path, improc=improc, vbfsettings=vbfsettings)
-    firstframe = rec.read_first_frame()
+    firstframe = rec.read_frame(frame)
+    # firstframe = rec.read_first_frame()
     return firstframe
 
 
@@ -228,7 +229,56 @@ class Recorder(QThread):
         else:
             raise ValueError("Could not recognize as a valid tvips file")
 
-    def read_first_frame(self):
+    def read_frame(self, frame=0):
+        ranges = self._get_files_ranges()
+        print(f"trying to get frame {frame}")
+        print("ranges for files:")
+        print(ranges)
+        with open(self.filename, "rb") as f:
+            fh = FileHandle(file=f)
+            fh.seek(0)
+            print(f"We start on file {self.filename}")
+            print(f"We are now at {fh.tell()}")
+            self._readGeneral(fh)
+            generalheadersize = fh.tell()
+            print(f"We read main header, now at {generalheadersize}")
+            print(f"In the general object it is {self.general.size}")
+        # now calculate the starting bite
+        # skip = self.inc - self.dt.itemsize
+        # print(f"skip: {skip}")
+        frame_byte_size = (self.general.dimx * self.general.dimy *
+                           self.general.bitsperpixel//8)
+        print(f"size of frame in bytes: {frame_byte_size}")
+        print(f"Size of frame header {self.general.frameheaderbytes}")
+        bite_start = (generalheadersize + self.general.frameheaderbytes +
+                      (frame_byte_size + self.general.frameheaderbytes)*frame)
+        print(f"We should find image at byte: {bite_start}")
+        # find in which file I must search
+        toopen = ""
+        for i in ranges:
+            mi, ma = ranges[i]
+            if bite_start < ma and bite_start > mi:
+                toopen = i
+                break
+        else:
+            raise ValueError(f"Frame {frame} is out of bounds")
+        print(f"It should be in file {toopen}")
+
+        with open(toopen, "rb") as f:
+            fh = FileHandle(file=f)
+            fh.seek(bite_start - ranges[toopen][0])
+            print(f"We are now at position {fh.tell()} in the file")
+            print(f"This is in total {fh.tell()+ranges[toopen][0]}")
+            frame = np.fromfile(
+                        fh,
+                        count=self.general.dimx*self.general.dimy,
+                        dtype=self.dtype
+                        )  # dtype=self.dtype,
+            frame.shape = (self.general.dimx, self.general.dimy)
+            print(f"Did it work? Frame: {type(frame)}")
+            return frame
+
+    def read_first_frame(self, frame=0):
         part = int(self.filename[-9:-6])
         if part != 0:
             raise ValueError("Can only read video sequences starting with "
@@ -237,11 +287,15 @@ class Recorder(QThread):
             fh = FileHandle(file=f)
             fh.seek(0)
             # skip general header from first file
+            print(f"File before main header: {fh.tell()}")
             self._readGeneral(fh)
             # read first frame
+            print(f"File after main header: {fh.tell()}")
             fh.read_record(self.frame_header)
+            print(f"File after first frame header: {fh.tell()}")
             skip = self.inc - self.dt.itemsize
             fh.seek(skip, 1)
+            print(f"File after skip, starting read: {fh.tell()}")
             # read frame
             frame = np.fromfile(
                         fh,
@@ -249,20 +303,41 @@ class Recorder(QThread):
                         dtype=self.dtype
                         )  # dtype=self.dtype,
             frame.shape = (self.general.dimx, self.general.dimy)
+            print(f"File after frame read: {fh.tell()}")
             return frame
         logger.debug("Read and stored the first frame")
+
+    def _get_files_size_dictionary(self):
+        """
+        Get a dictionary of files (keys) and total size (values)
+        """
+        def get_filesize(fn):
+            with open(fn, "rb") as f:
+                fh = FileHandle(file=f)
+                return fn, fh.size
+        sizes = self._scan_over_all_files(get_filesize)
+        return dict(sizes)
+
+    def _get_files_ranges(self):
+        """
+        Get a dictionary of files (keys) and the start and end
+        """
+        sizes = self._get_files_size_dictionary()
+        ranges = {}
+        starts = 0
+        for i in sizes:
+            ends = starts+sizes[i]
+            ranges[i] = (starts, ends)
+            starts = ends
+        return ranges
 
     def _get_total_scan_size(self):
         """
         Get the total file size of the entire stream for tracking
         the progress
         """
-        def get_filesize(fn):
-            with open(fn, "rb") as f:
-                fh = FileHandle(file=f)
-                return fh.size
-        sizes = self._scan_over_all_files(get_filesize)
-        return sum(sizes)
+        sizes = self._get_files_size_dictionary()
+        return sum(sizes.values())
 
     def _frames_exceeded(self):
         """Have we read the number of frames?"""

@@ -438,15 +438,16 @@ class bloFileWriter(QThread):
     increase_progress = pyqtSignal(int)
     finish = pyqtSignal()
 
-    def __init__(self, fh, path_blo, shape, indexes):
+    def __init__(self, fh, path_blo, shape, indexes,
+                 scan_scale=5, diff_scale=1.075):
         QThread.__init__(self)
         self.fh = fh  # open hdf5 file in read mode
         self.path_blo = path_blo
         self.shape = shape  # shape of hypercube
         self.indexes = indexes  # indexes: right order of frames
         # scale seems unknown and arbitrarily determined in original code
-        self.scan_scale = 5  # TODO can this be extracted from the TVIPS meta?
-        self.diff_scale = 1.075  # TODO can this be extracted from TVIPS meta?
+        self.scan_scale = scan_scale
+        self.diff_scale = diff_scale
         vbfs = self.fh["Scan"]["vbf_intensities"][:]
         self.vbf_im = vbfs[self.indexes].reshape(self.shape[0], self.shape[1])
         self.vbf_im = imagefun.normalize_convert(self.vbf_im, dtype=np.uint8)
