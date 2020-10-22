@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1077</width>
-    <height>1003</height>
+    <width>1136</width>
+    <height>1024</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -82,7 +82,7 @@
       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
@@ -156,8 +156,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>1033</width>
-            <height>755</height>
+            <width>1080</width>
+            <height>741</height>
            </rect>
           </property>
           <layout class="QHBoxLayout" name="horizontalLayout_11">
@@ -1003,8 +1003,8 @@
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>1009</width>
-                <height>667</height>
+                <width>1034</width>
+                <height>620</height>
                </rect>
               </property>
               <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -1436,7 +1436,7 @@
                       </widget>
                      </item>
                      <item row="0" column="4">
-                      <widget class="QSpinBox" name="spinBox_19">
+                      <widget class="QSpinBox" name="spinBox_23">
                        <property name="minimumSize">
                         <size>
                          <width>93</width>
@@ -1509,7 +1509,7 @@
                       </spacer>
                      </item>
                      <item row="0" column="2">
-                      <widget class="QSpinBox" name="spinBox_18">
+                      <widget class="QSpinBox" name="spinBox_22">
                        <property name="minimumSize">
                         <size>
                          <width>93</width>

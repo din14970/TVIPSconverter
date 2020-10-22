@@ -1,7 +1,6 @@
 from PyQt5 import uic
 from PyQt5.QtWidgets import (QApplication, QFileDialog, QGraphicsScene)
 from PyQt5.QtCore import QThread, pyqtSignal
-# from PyQt5.QtCore import Qt
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
@@ -164,9 +163,9 @@ class ConnectedWidget(rawgui):
 
     def update_final_frame(self):
         # update x, y crop box values
-        self.spinBox_18.setValue(0)
+        self.spinBox_22.setValue(0)
         self.spinBox_20.setValue(0)
-        self.spinBox_19.setValue(self.spinBox.value() - 1)
+        self.spinBox_23.setValue(self.spinBox.value() - 1)
         self.spinBox_21.setValue(self.spinBox_2.value() - 1)
 
         if self.checkBox_2.checkState():
@@ -583,11 +582,11 @@ class ConnectedWidget(rawgui):
             logger.debug("Calculating shape and indexes")
 
             # xmin, xmax, ymin, ymax
-            crop = (self.spinBox_18.value(),
-                    self.spinBox_19.value(),
+            crop = (self.spinBox_22.value(),
+                    self.spinBox_23.value(),
                     self.spinBox_20.value(),
                     self.spinBox_21.value(),
-                   )
+                    )
             shape, indexes = f.get_blo_export_data(sdimx, sdimy,
                                                    start_frame,
                                                    end_frame, hyst,
@@ -665,35 +664,32 @@ class ConnectedWidget(rawgui):
 
     def show_cropped_region(self):
         # check for validity of cropped region
-        xmin = self.spinBox_18.value()
-        xmax = self.spinBox_19.value()
+        xmin = self.spinBox_22.value()
+        xmax = self.spinBox_23.value()
         ymin = self.spinBox_20.value()
         ymax = self.spinBox_21.value()
-        
         if not xmax - xmin > 0:
             logger.warning('Not valid cropping dimensions: x.')
             return
         if not ymax - ymin > 0:
             logger.warning('Not valid cropping dimensions: x.')
             return
-
         label = 'crop_rect'
-
         try:
             # see if rectangle already plotted and just update
-            index = [i.get_label() for i in self.fig_vbf.axes[0].patches].index(label)
+            index = [i.get_label() for i in
+                     self.fig_vbf.axes[0].patches].index(label)
             rect = self.fig_vbf.axes[0].patches[index]
             logger.info('Updating rectangle.')
             rect.set_height(ymax - ymin)
             rect.set_width(xmax - xmin)
             rect.set_x(xmin)
             rect.set_y(ymin)
-            
         except ValueError:
             logger.info('Plotting rectangle.')
-            rect = plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, fill=False, ec='k', ls='dashed', label=label)
+            rect = plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
+                                 fill=False, ec='k', ls='dashed', label=label)
             self.fig_vbf.axes[0].add_patch(rect)
-        
         self.fig_vbf.canvas.draw()
 
 
