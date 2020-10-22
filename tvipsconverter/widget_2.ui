@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1077</width>
-    <height>1003</height>
+    <width>1171</width>
+    <height>898</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -156,8 +156,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>1021</width>
-            <height>720</height>
+            <width>1100</width>
+            <height>643</height>
            </rect>
           </property>
           <layout class="QHBoxLayout" name="horizontalLayout_11">
@@ -851,6 +851,37 @@
            </widget>
           </item>
           <item>
+           <widget class="QCheckBox" name="checkBox_13">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Limit the export to the first few frames. Mostly useful if part of the file is corrupted.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Frame range:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinBox_19">
+            <property name="maximum">
+             <number>999999999</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_36">
+            <property name="text">
+             <string>-</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinBox_18">
+            <property name="maximum">
+             <number>999999999</number>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QPushButton" name="pushButton_6">
             <property name="toolTip">
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Convert the TVIPS format to the intermediate HDF5 format. Data will be pre-processed and stored according to the settings in the pre-processing column!&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -1003,7 +1034,7 @@
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>960</width>
+                <width>1054</width>
                 <height>610</height>
                </rect>
               </property>
