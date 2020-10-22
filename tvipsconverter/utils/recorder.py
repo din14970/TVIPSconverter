@@ -9,7 +9,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 import logging
 from .imagefun import (normalize_convert, bin2, gausfilter,
-                       medfilter)  # getElectronWavelength,
+                       medfilter)
 
 # Initialize the Logger
 logger = logging.getLogger(__name__)
@@ -124,7 +124,6 @@ def filter_image(imag, useint, whichint, usebin,
 def getOriginalPreviewImage(path, improc, vbfsettings, frame=0):
     rec = Recorder(path, improc=improc, vbfsettings=vbfsettings)
     firstframe = rec.read_frame(frame)
-    # firstframe = rec.read_first_frame()
     return firstframe
 
 
@@ -133,20 +132,47 @@ class Recorder(QThread):
     increase_progress = pyqtSignal(int)
     finish = pyqtSignal()
 
-    def __init__(self, path, improc=None, vbfsettings=None, numframes=None,
-                 outputpath=None):
+    def __init__(self, path, improc=None, vbfsettings=None,
+                 outputpath=None, imrange=(None, None)):
         QThread.__init__(self)
         logger.debug("Initializing recorder object")
         # filename
         self.filename = path  # first input file
-        # general is the top header
-        self.general = None
-        self.dtype = None
-        # to limit the number of frames read, really only for debugging
-        self.numframes = numframes
+        with open(self.filename, "rb") as f:
+            fh = FileHandle(file=f)
+            fh.seek(0)
+            # defines: self.general, self.dtype, self.frameshape
+            # self.inc, self.frame_header
+            self._readGeneral(fh)
+            self.generalheadersize = fh.tell()
         # keep a count of the number of files already read
-        self.already_read = 0
-        self.frameshape = None
+        self.current_frame = 0
+        # a map of the file, which bytes start where
+        self.ranges = self._get_files_ranges()
+        # image range to consider
+        self.startim, self.finalim = imrange
+        self.startbyte = None
+        self.endbyte = None
+        # for tracking progress
+        self.total_size = self._get_total_scan_size()
+        if self.startim is not None:
+            self.startbyte = self._get_frame_byte_position(self.startim)
+            if self.startbyte > self.total_size:
+                raise ValueError("Start frame out of bounds")
+        else:
+            self.startbyte = 0
+            self.startim = 0
+        if self.finalim is not None:
+            self.endbyte = self._get_frame_byte_position(self.finalim)
+            if self.endbyte > self.total_size:
+                raise ValueError("End frame out of bounds")
+        else:
+            self.endbyte = self.total_size
+            self.finalim = self._get_byte_frame_position(self.endbyte)
+        print(f"We expect the last frame to be {self.startim}")
+        print(f"We expect the last frame to be {self.finalim}")
+        if self.startbyte >= self.endbyte:
+            raise ValueError("Start frame must be less than end frame")
         # image processing settings
         self.improc = improc
         if self.improc is None:
@@ -168,12 +194,10 @@ class Recorder(QThread):
         """
         Convert to an HDF5 file
         """
-        # for tracking progress
-        self.total_size = self._get_total_scan_size()
         # progress as measured by files
         self.prog = 0
         # progress as measured within files
-        self.fileprog = 0
+        self.cur_pos_in_file = 0
         # HDF5 object to write the raw data to
         try:
             self.stream = h5py.File(self.outputpath, "w")
@@ -185,7 +209,7 @@ class Recorder(QThread):
         for k, v in self.improc.items():
             pg.attrs[k] = v
         # This is important! also initializes the headers!
-        firstframe = self.read_first_frame()
+        firstframe = self.read_frame(0)
         pff = filter_image(firstframe, **self.improc)
         self.scangroup = self.stream.create_group("Scan")
         # do we need a virtual bright field calculated?
@@ -204,6 +228,7 @@ class Recorder(QThread):
         # the start and stop frames
         # for convenience we also store rotation
         # indexes. For the end index we go backwards.
+        # for calculating where the scan began and stopped
         self.start = None
         self.end = None
         self.rotidxs = []
@@ -230,82 +255,60 @@ class Recorder(QThread):
             raise ValueError("Could not recognize as a valid tvips file")
 
     def read_frame(self, frame=0):
-        ranges = self._get_files_ranges()
-        print(f"trying to get frame {frame}")
-        print("ranges for files:")
-        print(ranges)
-        with open(self.filename, "rb") as f:
+        bite_start = self._get_frame_byte_position(frame)
+        toopen = self._get_byte_filename(bite_start)
+        with open(toopen, "rb") as f:
             fh = FileHandle(file=f)
-            fh.seek(0)
-            print(f"We start on file {self.filename}")
-            print(f"We are now at {fh.tell()}")
-            self._readGeneral(fh)
-            generalheadersize = fh.tell()
-            print(f"We read main header, now at {generalheadersize}")
-            print(f"In the general object it is {self.general.size}")
-        # now calculate the starting bite
-        # skip = self.inc - self.dt.itemsize
-        # print(f"skip: {skip}")
-        frame_byte_size = (self.general.dimx * self.general.dimy *
-                           self.general.bitsperpixel//8)
-        print(f"size of frame in bytes: {frame_byte_size}")
-        print(f"Size of frame header {self.general.frameheaderbytes}")
-        bite_start = (generalheadersize + self.general.frameheaderbytes +
-                      (frame_byte_size + self.general.frameheaderbytes)*frame)
-        print(f"We should find image at byte: {bite_start}")
+            fh.seek(bite_start - self.ranges[toopen][0])
+            frame = np.fromfile(
+                        fh,
+                        count=self.general.dimx*self.general.dimy,
+                        dtype=self.dtype
+                        )
+            frame.shape = (self.general.dimx, self.general.dimy)
+            return frame
+
+    def _get_frame_filename(self, frame):
+        """Get the filename where a certain frame is in"""
+        bite_start = self._get_frame_byte_position(frame)
+        return self._get_byte_filename(bite_start)
+
+    def _get_byte_filename(self, b):
+        """Get the filename where the byte b is in"""
         # find in which file I must search
         toopen = ""
-        for i in ranges:
-            mi, ma = ranges[i]
-            if bite_start < ma and bite_start > mi:
+        for i in self.ranges:
+            mi, ma = self.ranges[i]
+            if b < ma and b > mi:
                 toopen = i
                 break
         else:
-            raise ValueError(f"Frame {frame} is out of bounds")
-        print(f"It should be in file {toopen}")
+            raise ValueError(f"Byte {b} is out of bounds")
+        return toopen
 
-        with open(toopen, "rb") as f:
-            fh = FileHandle(file=f)
-            fh.seek(bite_start - ranges[toopen][0])
-            print(f"We are now at position {fh.tell()} in the file")
-            print(f"This is in total {fh.tell()+ranges[toopen][0]}")
-            frame = np.fromfile(
-                        fh,
-                        count=self.general.dimx*self.general.dimy,
-                        dtype=self.dtype
-                        )  # dtype=self.dtype,
-            frame.shape = (self.general.dimx, self.general.dimy)
-            print(f"Did it work? Frame: {type(frame)}")
-            return frame
+    def _get_frame_byte_position(self, frame):
+        """Get the byte where a frame starts"""
+        frame_byte_size = (self.general.dimx * self.general.dimy *
+                           self.general.bitsperpixel//8)
+        bite_start = (self.generalheadersize + self.general.frameheaderbytes +
+                      (frame_byte_size + self.general.frameheaderbytes)*frame)
+        return bite_start
 
-    def read_first_frame(self, frame=0):
-        part = int(self.filename[-9:-6])
-        if part != 0:
-            raise ValueError("Can only read video sequences starting with "
-                             "part 000")
-        with open(self.filename, "rb") as f:
-            fh = FileHandle(file=f)
-            fh.seek(0)
-            # skip general header from first file
-            print(f"File before main header: {fh.tell()}")
-            self._readGeneral(fh)
-            # read first frame
-            print(f"File after main header: {fh.tell()}")
-            fh.read_record(self.frame_header)
-            print(f"File after first frame header: {fh.tell()}")
-            skip = self.inc - self.dt.itemsize
-            fh.seek(skip, 1)
-            print(f"File after skip, starting read: {fh.tell()}")
-            # read frame
-            frame = np.fromfile(
-                        fh,
-                        count=self.general.dimx*self.general.dimy,
-                        dtype=self.dtype
-                        )  # dtype=self.dtype,
-            frame.shape = (self.general.dimx, self.general.dimy)
-            print(f"File after frame read: {fh.tell()}")
-            return frame
-        logger.debug("Read and stored the first frame")
+    def _get_frame_byte_position_in_file(self, frame):
+        """Get the byte where a frame starts in a file"""
+        abs_pos = self._get_frame_byte_position(frame)
+        fn = self._get_byte_filename(abs_pos)
+        mi, _ = self.ranges[fn]
+        return abs_pos - mi
+
+    def _get_byte_frame_position(self, byte_start):
+        """Get the frame index closest corresponding to a byte"""
+        frame_byte_size = (self.general.dimx * self.general.dimy *
+                           self.general.bitsperpixel//8)
+        frame = ((byte_start - self.generalheadersize -
+                 self.general.frameheaderbytes) //
+                 (frame_byte_size + self.general.frameheaderbytes))
+        return frame
 
     def _get_files_size_dictionary(self):
         """
@@ -337,13 +340,21 @@ class Recorder(QThread):
         the progress
         """
         sizes = self._get_files_size_dictionary()
-        return sum(sizes.values())
+        size = sum(sizes.values())
+        return size
+
+    def _get_total_scan_size_limited(self):
+        """Scan size considering start and end frame"""
+        if self.endbyte:
+            size = self.endbyte
+        if self.startbyte:
+            size = size - self.startbyte
 
     def _frames_exceeded(self):
         """Have we read the number of frames?"""
-        if self.numframes is not None:
-            if self.already_read >= self.numframes:
-                logger.debug(f"{self.already_read} frames have been read. "
+        if self.finalim is not None:
+            if self.current_frame >= self.finalim:
+                logger.debug(f"We are at frame {self.current_frame}. "
                              f"Quitting.")
                 return True
         return False
@@ -415,18 +426,23 @@ class Recorder(QThread):
                 self._readGeneral(fh)
             # read frames
             while fh.tell() < fh.size:
+                if self.startim > self.current_frame:
+                    self.current_frame += 1
+                    current_byte = self._get_frame_byte_position_in_file(
+                            self.current_frame)
+                    fh.seek(current_byte - self.general.frameheaderbytes)
+                    continue
+                if self.finalim < self.current_frame:
+                    break
                 self._readFrame(fh)
-                self.already_read += 1  # increment number of frames
-                if self._frames_exceeded():
-                    raise StopIteration
-            # progress
-            self.prog += self.fileprog
-            self.fileprog = 0
+                self.current_frame += 1  # increment number of frames
+                # update the progressbar
+                self._update_gui_progess()
 
     def _readFrame(self, fh, record=None):
         # read frame header
         header = fh.read_record(self.frame_header)
-        logger.debug(f"{self.already_read}: Starting frame read "
+        logger.debug(f"{self.current_frame}: Starting frame read "
                      f"(pos: {fh.tell()}). rot: {header['rotidx']}")
         skip = self.inc - self.dt.itemsize
         fh.seek(skip, 1)
@@ -435,12 +451,12 @@ class Recorder(QThread):
                     fh,
                     count=self.general.dimx*self.general.dimy,
                     dtype=self.dtype
-                    )  # dtype=self.dtype,
+                    )
         frame.shape = (self.general.dimx, self.general.dimy)
         # do calculations on the frame
         frame = filter_image(frame, **self.improc)
         # put the frame in the hdf5 file under the group
-        c = f"{self.already_read}".zfill(6)
+        c = f"{self.current_frame-self.startim}".zfill(6)
         ds = self.streamgroup.create_dataset(f"Frame_{c}", data=frame)
         for i in self.frame_header:
             ds.attrs[i[0]] = header[i[0]]
@@ -450,20 +466,15 @@ class Recorder(QThread):
         if self.vbfproc["calcvbf"]:
             vbf_int = frame[self.mask].mean()
             self.vbfs.append(vbf_int)
-        # update the progressbar
-        self.fileprog = fh.tell()
-        self._update_gui_progess()
 
     def _update_gui_progess(self):
         """If using the GUI update features with progress"""
-        value = int((self.prog+self.fileprog)/self.total_size*100)
-        # logging.debug(f"We are at prog {self.prog}, fileprog {self.fileprog}"
-        #               f"total size {self.total_size}: value={value}")
+        value = int((self.current_frame - self.startim) /
+                    (self.finalim - self.startim)*100)
         self.increase_progress.emit(value)
-        # self.progbar.setValue((self.prog+self.fileprog)//self.total_size*100)
 
     def _find_start_and_stop(self):
-        # find out if it's the first or last frame
+        """ find out if it's the first or last frame """
         previous = self.rotidxs[0]
         for j, i in enumerate(self.rotidxs):
             if i > previous:

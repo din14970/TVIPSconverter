@@ -387,6 +387,13 @@ class ConnectedWidget(rawgui):
     def done(self):
         self.window.setEnabled(True)
 
+    @property
+    def image_range(self):
+        if self.checkBox_13.checkState():
+            return self.spinBox_19.value(), self.spinBox_18.value()
+        else:
+            return None, None
+
     def write_to_hdf5(self):
         try:
             (self.inpath, self.improc,
@@ -402,10 +409,12 @@ class ConnectedWidget(rawgui):
             opath = self.oupath
             improc = self.improc
             vbfsettings = self.vbfsettings
+            start_frame, end_frame = self.image_range
             self.get_thread = rec.Recorder(path,
                                            improc=improc,
                                            vbfsettings=vbfsettings,
-                                           outputpath=opath)
+                                           outputpath=opath,
+                                           imrange=(start_frame, end_frame))
             self.get_thread.increase_progress.connect(self.increase_progbar)
             self.get_thread.finish.connect(self.done_hdf5export)
             self.get_thread.start()
