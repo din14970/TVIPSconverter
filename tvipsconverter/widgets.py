@@ -109,6 +109,8 @@ class ConnectedWidget(rawgui):
         self.pushButton_12.clicked.connect(self.get_tiff_path)
         # export tiff files
         self.pushButton_11.clicked.connect(self.export_tiffs)
+        # show cropped region
+        self.pushButton_13.clicked.connect(self.show_cropped_region)
 
     def export_preview(self):
         try:
@@ -161,6 +163,12 @@ class ConnectedWidget(rawgui):
         pass
 
     def update_final_frame(self):
+        # update x, y crop box values
+        self.spinBox_18.setValue(0)
+        self.spinBox_20.setValue(0)
+        self.spinBox_19.setValue(self.spinBox.value() - 1)
+        self.spinBox_21.setValue(self.spinBox_2.value() - 1)
+
         if self.checkBox_2.checkState():
             # we use self defined size
             start = self.spinBox_15.value()
@@ -573,9 +581,17 @@ class ConnectedWidget(rawgui):
                          f"Dims: x {sdimx} y {sdimy},"
                          f"hyst: {hyst}, snakescan: {snakescan}")
             logger.debug("Calculating shape and indexes")
+
+            # xmin, xmax, ymin, ymax
+            crop = (self.spinBox_18.value(),
+                    self.spinBox_19.value(),
+                    self.spinBox_20.value(),
+                    self.spinBox_21.value(),
+                   )
             shape, indexes = f.get_blo_export_data(sdimx, sdimy,
                                                    start_frame,
-                                                   end_frame, hyst, snakescan)
+                                                   end_frame, hyst,
+                                                   snakescan, crop=crop)
             logger.debug(f"Shape: {shape}")
             logger.debug(f"Starting to write {filetyp} file")
             self.update_line(self.statusedit, f"Writing {filetyp} file...")
@@ -646,6 +662,39 @@ class ConnectedWidget(rawgui):
     def hardRepaint(self):
         self.window.hide()
         self.window.show()
+
+    def show_cropped_region(self):
+        # check for validity of cropped region
+        xmin = self.spinBox_18.value()
+        xmax = self.spinBox_19.value()
+        ymin = self.spinBox_20.value()
+        ymax = self.spinBox_21.value()
+        
+        if not xmax - xmin > 0:
+            logger.warning('Not valid cropping dimensions: x.')
+            return
+        if not ymax - ymin > 0:
+            logger.warning('Not valid cropping dimensions: x.')
+            return
+
+        label = 'crop_rect'
+
+        try:
+            # see if rectangle already plotted and just update
+            index = [i.get_label() for i in self.fig_vbf.axes[0].patches].index(label)
+            rect = self.fig_vbf.axes[0].patches[index]
+            logger.info('Updating rectangle.')
+            rect.set_height(ymax - ymin)
+            rect.set_width(xmax - xmin)
+            rect.set_x(xmin)
+            rect.set_y(ymin)
+            
+        except ValueError:
+            logger.info('Plotting rectangle.')
+            rect = plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, fill=False, ec='k', ls='dashed', label=label)
+            self.fig_vbf.axes[0].add_patch(rect)
+        
+        self.fig_vbf.canvas.draw()
 
 
 def main():

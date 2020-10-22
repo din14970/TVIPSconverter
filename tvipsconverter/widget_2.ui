@@ -82,7 +82,7 @@
       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
@@ -156,8 +156,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>1021</width>
-            <height>720</height>
+            <width>1033</width>
+            <height>755</height>
            </rect>
           </property>
           <layout class="QHBoxLayout" name="horizontalLayout_11">
@@ -1003,8 +1003,8 @@
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>960</width>
-                <height>610</height>
+                <width>1009</width>
+                <height>667</height>
                </rect>
               </property>
               <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -1176,93 +1176,6 @@
                      <string>Scan modification</string>
                     </property>
                     <layout class="QGridLayout" name="gridLayout_6">
-                     <item row="3" column="0">
-                      <widget class="QLabel" name="label_3">
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Frame in the stream where the scan began&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
-                       <property name="text">
-                        <string>Scan start frame</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="6" column="0">
-                      <widget class="QCheckBox" name="checkBox_6">
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If data was collected with EM Konos, the scan happened in a snake pattern with some overshoot on each return. Hysteresis applies a constant shift to every even line to correct for this.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
-                       <property name="text">
-                        <string>Hysteresis</string>
-                       </property>
-                       <property name="checked">
-                        <bool>false</bool>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="7" column="0">
-                      <widget class="QCheckBox" name="checkBox_12">
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In EM Konos, the scanning follows a winding scan pattern (check on), whereas in EM Scan it uses normal flyback scan (check off)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
-                       <property name="text">
-                        <string>Winding scan?</string>
-                       </property>
-                       <property name="checkable">
-                        <bool>true</bool>
-                       </property>
-                       <property name="checked">
-                        <bool>false</bool>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="2" column="0" colspan="5">
-                      <widget class="QCheckBox" name="checkBox_11">
-                       <property name="text">
-                        <string>Use custom scan frames</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="3" column="6">
-                      <spacer name="horizontalSpacer_7">
-                       <property name="orientation">
-                        <enum>Qt::Horizontal</enum>
-                       </property>
-                       <property name="sizeHint" stdset="0">
-                        <size>
-                         <width>40</width>
-                         <height>20</height>
-                        </size>
-                       </property>
-                      </spacer>
-                     </item>
-                     <item row="6" column="1">
-                      <widget class="QSpinBox" name="spinBox_9">
-                       <property name="enabled">
-                        <bool>true</bool>
-                       </property>
-                       <property name="sizePolicy">
-                        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                         <horstretch>0</horstretch>
-                         <verstretch>0</verstretch>
-                        </sizepolicy>
-                       </property>
-                       <property name="minimumSize">
-                        <size>
-                         <width>93</width>
-                         <height>0</height>
-                        </size>
-                       </property>
-                       <property name="minimum">
-                        <number>-100000000</number>
-                       </property>
-                       <property name="maximum">
-                        <number>100000000</number>
-                       </property>
-                       <property name="value">
-                        <number>5</number>
-                       </property>
-                      </widget>
-                     </item>
                      <item row="6" column="3">
                       <widget class="QLabel" name="label_27">
                        <property name="sizePolicy">
@@ -1295,15 +1208,8 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="3" column="1">
-                      <widget class="QSpinBox" name="spinBox_15">
-                       <property name="maximum">
-                        <number>100000000</number>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="1" column="1">
-                      <widget class="QSpinBox" name="spinBox">
+                     <item row="6" column="1">
+                      <widget class="QSpinBox" name="spinBox_9">
                        <property name="enabled">
                         <bool>true</bool>
                        </property>
@@ -1320,16 +1226,20 @@
                         </size>
                        </property>
                        <property name="minimum">
-                        <number>1</number>
+                        <number>-100000000</number>
                        </property>
                        <property name="maximum">
-                        <number>10000</number>
-                       </property>
-                       <property name="singleStep">
-                        <number>1</number>
+                        <number>100000000</number>
                        </property>
                        <property name="value">
-                        <number>100</number>
+                        <number>5</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="1">
+                      <widget class="QSpinBox" name="spinBox_15">
+                       <property name="maximum">
+                        <number>100000000</number>
                        </property>
                       </widget>
                      </item>
@@ -1352,8 +1262,8 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="1" column="4">
-                      <widget class="QSpinBox" name="spinBox_2">
+                     <item row="1" column="1">
+                      <widget class="QSpinBox" name="spinBox">
                        <property name="enabled">
                         <bool>true</bool>
                        </property>
@@ -1399,10 +1309,90 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="0" column="0" colspan="7">
-                      <widget class="QCheckBox" name="checkBox_2">
+                     <item row="1" column="4">
+                      <widget class="QSpinBox" name="spinBox_2">
+                       <property name="enabled">
+                        <bool>true</bool>
+                       </property>
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
+                       </property>
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="minimum">
+                        <number>1</number>
+                       </property>
+                       <property name="maximum">
+                        <number>10000</number>
+                       </property>
+                       <property name="singleStep">
+                        <number>1</number>
+                       </property>
+                       <property name="value">
+                        <number>100</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="0">
+                      <widget class="QCheckBox" name="checkBox_6">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If data was collected with EM Konos, the scan happened in a snake pattern with some overshoot on each return. Hysteresis applies a constant shift to every even line to correct for this.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
                        <property name="text">
-                        <string>Use custom scan dimensions</string>
+                        <string>Hysteresis</string>
+                       </property>
+                       <property name="checked">
+                        <bool>false</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="0">
+                      <widget class="QLabel" name="label_3">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Frame in the stream where the scan began&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="text">
+                        <string>Scan start frame</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="0" colspan="5">
+                      <widget class="QCheckBox" name="checkBox_11">
+                       <property name="text">
+                        <string>Use custom scan frames</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="6">
+                      <spacer name="horizontalSpacer_7">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="7" column="0">
+                      <widget class="QCheckBox" name="checkBox_12">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In EM Konos, the scanning follows a winding scan pattern (check on), whereas in EM Scan it uses normal flyback scan (check off)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="text">
+                        <string>Winding scan?</string>
+                       </property>
+                       <property name="checkable">
+                        <bool>true</bool>
                        </property>
                        <property name="checked">
                         <bool>false</bool>
@@ -1416,6 +1406,137 @@
                        </property>
                        <property name="text">
                         <string>Scan stop frame</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="0" colspan="7">
+                      <widget class="QCheckBox" name="checkBox_2">
+                       <property name="text">
+                        <string>Use custom scan dimensions</string>
+                       </property>
+                       <property name="checked">
+                        <bool>false</bool>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QGroupBox" name="groupBox_9">
+                    <property name="title">
+                     <string>Crop</string>
+                    </property>
+                    <layout class="QGridLayout" name="gridLayout_11">
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="label_37">
+                       <property name="text">
+                        <string>ymin</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="4">
+                      <widget class="QSpinBox" name="spinBox_19">
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="maximum">
+                        <number>1000</number>
+                       </property>
+                       <property name="value">
+                        <number>100</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="0">
+                      <widget class="QLabel" name="label_36">
+                       <property name="text">
+                        <string>xmin</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="4">
+                      <widget class="QSpinBox" name="spinBox_21">
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="maximum">
+                        <number>1000</number>
+                       </property>
+                       <property name="value">
+                        <number>100</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="5">
+                      <widget class="QPushButton" name="pushButton_13">
+                       <property name="text">
+                        <string>Show Cropped Region</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="3">
+                      <widget class="QLabel" name="label_39">
+                       <property name="text">
+                        <string>ymax</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="3">
+                      <widget class="QLabel" name="label_38">
+                       <property name="text">
+                        <string>xmax</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="5">
+                      <spacer name="horizontalSpacer_14">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="0" column="2">
+                      <widget class="QSpinBox" name="spinBox_18">
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="maximum">
+                        <number>1000</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="2">
+                      <widget class="QSpinBox" name="spinBox_20">
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="minimum">
+                        <number>0</number>
+                       </property>
+                       <property name="maximum">
+                        <number>1000</number>
+                       </property>
+                       <property name="value">
+                        <number>0</number>
                        </property>
                       </widget>
                      </item>

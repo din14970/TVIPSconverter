@@ -610,10 +610,10 @@ class hdf5Intermediate(h5py.File):
         return img
 
     def get_blo_export_data(self, sdimx=None, sdimy=None, start_frame=None,
-                            end_frame=None, hyst=0, snakescan=True):
+                            end_frame=None, hyst=0, snakescan=True, crop=None):
         scan_indexes = self.calculate_scan_export_indexes(
             sdimx=sdimx, sdimy=sdimy, start_frame=start_frame,
-            end_frame=end_frame, hyst=hyst, snakescan=snakescan)
+            end_frame=end_frame, hyst=hyst, snakescan=snakescan, crop=crop)
         logger.debug("Calculated scan indexes")
         if sdimx is None:
             sdimx = self.sdimx
@@ -623,12 +623,16 @@ class hdf5Intermediate(h5py.File):
             imshap = self["ImageStream"]["Frame_000000"].shape
         except Exception:
             raise Exception("Could not find image size")
+        if crop is not None:
+            xmin, xmax, ymin, ymax = crop
+            sdimx = xmax - xmin
+            sdimy = ymax-ymin
         shape = (sdimx, sdimy, *imshap)
         return shape, scan_indexes
 
     def calculate_scan_export_indexes(self, sdimx=None, sdimy=None,
                                       start_frame=None, end_frame=None,
-                                      hyst=0, snakescan=True):
+                                      hyst=0, snakescan=True, crop=None):
         """Calculate the indexes of the list of frames to consider for the
         scan or VBF"""
         try:
@@ -665,6 +669,18 @@ class hdf5Intermediate(h5py.File):
                 sel[::2] = sel[::2][:, ::-1]
             # hysteresis correction on even scan lines
             sel[::2] = np.roll(sel[::2], hyst, axis=1)
+
+            # check for crop
+            if crop is not None:
+                logger.info('Cropping to: {}'.format(crop))
+                if all(i is not None for i in crop):
+                    xmin, xmax, ymin, ymax = crop
+
+                    if all(i >= 0 for i in (xmin, ymin)) and xmax < sdimx and ymax < sdimy:
+                        sel = sel[ymin: ymax, xmin: xmax]
+                    else:
+                        logger.warning('Aborting crop due to incorrect given dimensions: {}'.format(crop))
+
             return sel.ravel()
         # if frames or not given, we must use our best guess and match
         # rotators
