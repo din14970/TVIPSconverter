@@ -685,8 +685,10 @@ class ConnectedWidget(rawgui):
             return
 
         if self.fig_vbf is None:
+            logger.warning('No VBF figure plotted yet.')
             # no VBF figure plotted yet
             return
+
         
         label = 'crop_rect'
         try:
