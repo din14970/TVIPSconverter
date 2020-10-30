@@ -82,7 +82,7 @@
       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
@@ -156,8 +156,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>1100</width>
-            <height>643</height>
+            <width>1127</width>
+            <height>650</height>
            </rect>
           </property>
           <layout class="QHBoxLayout" name="horizontalLayout_11">
@@ -1034,8 +1034,8 @@
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>1054</width>
-                <height>610</height>
+                <width>1086</width>
+                <height>565</height>
                </rect>
               </property>
               <layout class="QHBoxLayout" name="horizontalLayout_2">
