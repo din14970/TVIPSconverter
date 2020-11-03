@@ -615,7 +615,14 @@ class ConnectedWidget(rawgui):
             self.update_line(self.statusedit, f"Writing {filetyp} file...")
             if filetyp == ".blo":
                 self.get_thread = blf.bloFileWriter(
-                    f, path_blo, shape, indexes, scan_scale, dp_scale
+                    f,
+                    path_blo,
+                    shape,
+                    indexes,
+                    scan_scale,
+                    dp_scale,
+                    # if rescale button is checked do rescale, otherwise no rescaling selected
+                    rescale=self.checkBox_rescale.isChecked(),
                 )
             elif filetyp == ".hspy":
                 self.get_thread = hspf.hspyFileWriter(
