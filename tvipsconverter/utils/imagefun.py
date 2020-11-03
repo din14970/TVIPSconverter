@@ -13,10 +13,16 @@ def _get_dtype_min_max(dtype):
     if dtype == np.float or dtype == np.float32 or dtype == np.float64:
         max = 1  # np.finfo(dtype).max
         min = 0  # np.finfo(dtype).min
-    elif (dtype == np.int8 or dtype == np.uint8 or
-          dtype == np.int16 or dtype == np.uint16 or
-          dtype == np.int32 or dtype == np.uint32 or
-          dtype == np.int64 or dtype == np.uint64):
+    elif (
+        dtype == np.int8
+        or dtype == np.uint8
+        or dtype == np.int16
+        or dtype == np.uint16
+        or dtype == np.int32
+        or dtype == np.uint32
+        or dtype == np.int64
+        or dtype == np.uint64
+    ):
         max = np.iinfo(dtype).max
         min = np.iinfo(dtype).min
     else:
@@ -119,8 +125,8 @@ def linscale(arr, min=None, max=None, nmin=0, nmax=1, dtype=np.float):
     else:
         workarr[workarr > max] = max
 
-    a = (nmax-nmin)/(max-min)
-    result = (workarr-min)*a+nmin
+    a = (nmax - nmin) / (max - min)
+    result = (workarr - min) * a + nmin
     return result.astype(dtype)
 
 
@@ -142,10 +148,10 @@ def matlab_style_gauss2D(shape=(3, 3), sigma=0.5):
     2D gaussian mask - should give the same result as MATLAB's
     fspecial('gaussian',[shape],[sigma])
     """
-    m, n = [(ss-1.)/2. for ss in shape]
-    y, x = np.ogrid[-m:m+1, -n:n+1]
-    h = np.exp(-(x*x + y*y) / (2.*sigma*sigma))
-    h[h < np.finfo(h.dtype).eps*h.max()] = 0
+    m, n = [(ss - 1.0) / 2.0 for ss in shape]
+    y, x = np.ogrid[-m : m + 1, -n : n + 1]
+    h = np.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
+    h[h < np.finfo(h.dtype).eps * h.max()] = 0
     sumh = h.sum()
     if sumh != 0:
         h /= sumh
@@ -168,14 +174,14 @@ def findoutliers(raw, percent=0.07):
     Uses returns min and max values of the array with the upper and
     lower percent pixel values suppressed.
     """
-    cnts, edges = np.histogram(raw, bins=2**16)
-    stats = np.zeros((2, 2**16), dtype=np.int)
+    cnts, edges = np.histogram(raw, bins=2 ** 16)
+    stats = np.zeros((2, 2 ** 16), dtype=np.int)
     stats[0] = np.cumsum(cnts)  # low
     stats[1] = np.cumsum(cnts[::-1])  # high
     thresh = stats > percent * raw.shape[0] * raw.shape[1]
     min = (np.where(thresh[0]))[0][0]
-    max = 2**16 - (np.where(thresh[1]))[0][0]
-    return edges[min], edges[max+1]
+    max = 2 ** 16 - (np.where(thresh[1]))[0][0]
+    return edges[min], edges[max + 1]
 
 
 def suppressoutliers(raw, percent=0.07):
@@ -191,9 +197,11 @@ def bin2(a, factor):
     imag = Image.fromarray(a)
     # binned = Image.resize(imag, (a.shape[0]//factor, a.shape[1]//factor),
     #                       resample=Image.BILINEAR)
-    binned = np.array(imag.resize((a.shape[0]//factor, a.shape[1]//factor),
-                      resample=Image.NEAREST))
-    print(binned.dtype)
+    binned = np.array(
+        imag.resize(
+            (a.shape[0] // factor, a.shape[1] // factor), resample=Image.NEAREST
+        )
+    )
     return binned
 
 
@@ -204,5 +212,5 @@ def getElectronWavelength(ht):
     charge = 1.6e-19
     c = 3e8
     wavelength = h / math.sqrt(2 * m * charge * ht)
-    relativistic_correction = 1 / math.sqrt(1 + ht * charge/(2 * m * c * c))
+    relativistic_correction = 1 / math.sqrt(1 + ht * charge / (2 * m * c * c))
     return wavelength * relativistic_correction
