@@ -513,6 +513,7 @@ class Recorder(QThread):
             vbf_int = frame[self.mask].mean()
             self.vbfs.append(vbf_int)
 
+        # calculate images as specified in the options
         if "calcmax" in self.options and self.options["calcmax"]:
             # maximum_image should already be initialised in self.convert_HDF5
             self.maximum_image = np.stack((self.maximum_image, frame), axis=0).max(
