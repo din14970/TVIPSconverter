@@ -205,6 +205,25 @@ def bin2(a, factor):
     return binned
 
 
+def bin_box(a, factor):
+    """
+
+    Use box averaging to bin the images.
+
+    """
+    assert all(
+        not i % factor for i in a.shape
+    ), "array shape is not factorisable by factor."
+    # should work ndim
+    slices = tuple(
+        tuple((slice(j, None, factor)) for i in range(a.ndim)) for j in range(factor)
+    )
+
+    # stack th offset slices and take mean down stack axis to finish binning
+    cube = np.stack([a[s] for s in slices], axis=0)
+    return cube.mean(axis=0)
+
+
 def getElectronWavelength(ht):
     # ht in Volts, length unit in meters
     h = 6.6e-34
