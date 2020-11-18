@@ -9,7 +9,7 @@ Dummy
 garbage
 .ipynb*
 .venvtest
-.DS_STORE
+.DS_Store
 
 # Created by https://www.gitignore.io/api/python
 # Edit at https://www.gitignore.io/?templates=python
@@ -122,7 +122,5 @@ dmypy.json
 # vs code
 .vscode/
 
-# Mac
-.DS_Store
 
 # End of https://www.gitignore.io/api/python
