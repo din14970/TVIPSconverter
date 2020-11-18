@@ -1,6 +1,7 @@
 from PyQt5 import uic
 from PyQt5.QtWidgets import QApplication, QFileDialog, QGraphicsScene
 from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtGui import QIcon, QPixmap
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
@@ -12,8 +13,8 @@ import numpy as np
 import os
 
 # hotfix 3.9 MacOS Big Sur bug
-if sys.platform == 'darwin':
-    os.environ['QT_MAC_WANTS_LAYER'] = '1'
+if sys.platform == "darwin":
+    os.environ["QT_MAC_WANTS_LAYER"] = "1"
 
 from .utils import recorder as rec
 from .utils import blockfile as blf
@@ -25,7 +26,9 @@ sys.path.append(".")
 
 logger = logging.getLogger(__name__)
 # import the UI interface
-rawgui, Window = uic.loadUiType(str(Path(__file__).parent.absolute()) + "/widget_2.ui")
+rawgui, Window = uic.loadUiType(
+    str(Path(__file__).parent.absolute()) + os.sep + "widget.ui"
+)
 
 
 class External(QThread):
@@ -238,6 +241,7 @@ class ConnectedWidget(rawgui):
             "lsmin": self.spinBox_7.value(),
             "lsmax": self.spinBox_8.value(),
             "usecoffset": self.checkBox.checkState(),
+            "bintype": self.radioButton_decimation.isChecked(),  # if True then use decimation otherwise box averaging
         }
         vbfsettings = {
             "calcvbf": self.checkBox_10.checkState(),
@@ -740,6 +744,9 @@ def main():
     window = Window()
     _ = ConnectedWidget(window)
     window.setWindowTitle("TVIPS converter")
+    # window.setWindowIcon(
+    #     QIcon(QPixmap(os.path.join(os.path.dirname(__file__), "Icon 128.png")))
+    # )
     window.show()
     app.exec_()
 

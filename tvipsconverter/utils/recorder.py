@@ -8,7 +8,7 @@ import re
 from PyQt5.QtCore import QThread, pyqtSignal
 
 import logging
-from .imagefun import normalize_convert, bin2, gausfilter, medfilter
+from .imagefun import normalize_convert, bin2, bin_box, gausfilter, medfilter
 
 # Initialize the Logger
 logger = logging.getLogger(__name__)
@@ -110,6 +110,7 @@ def filter_image(
     lsmin,
     lsmax,
     usecoffset,
+    bintype,
 ):
     """
     Filter an image and return the filtered image
@@ -119,7 +120,17 @@ def filter_image(
         imag = np.where(imag > whichint, 0, imag)
     # binning by some factor
     if usebin:
-        imag = bin2(imag, whichbin)
+        if bintype:  # if True use interpolate, else box
+            imag = bin2(imag, whichbin)
+        else:
+            # test binning factor will work
+            if all(not i % whichbin for i in imag.shape):
+                imag = bin_box(imag, whichbin)
+            else:
+                logger.warning(
+                    "array shape is not factorisable by factor, using decimation instead."
+                )
+                imag = bin2(imag, whichbin)
     # median filter
     if usemed:
         imag = medfilter(imag, medks)

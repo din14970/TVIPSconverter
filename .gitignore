@@ -120,5 +120,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# vs code
+.vscode/
+
+
 # End of https://www.gitignore.io/api/python
 .vscode/settings.json
