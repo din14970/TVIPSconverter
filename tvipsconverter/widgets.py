@@ -1,11 +1,10 @@
 from PyQt5 import uic
-from PyQt5.QtWidgets import (QApplication, QFileDialog, QGraphicsScene)
+from PyQt5.QtWidgets import QApplication, QFileDialog, QGraphicsScene
 from PyQt5.QtCore import QThread, pyqtSignal
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
-from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as
-                                                FigureCanvas)
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from pathlib import Path
 import logging
 from time import sleep
@@ -26,14 +25,14 @@ sys.path.append(".")
 
 logger = logging.getLogger(__name__)
 # import the UI interface
-rawgui, Window = uic.loadUiType(str(Path(__file__).parent.absolute()) +
-                                "/widget_2.ui")
+rawgui, Window = uic.loadUiType(str(Path(__file__).parent.absolute()) + "/widget_2.ui")
 
 
 class External(QThread):
     """
     Runs a counter thread.
     """
+
     countChanged = pyqtSignal(int)
     finish = pyqtSignal()
 
@@ -52,6 +51,7 @@ class External(QThread):
 
 class ConnectedWidget(rawgui):
     """Class connecting the gui elements to the back-end functionality"""
+
     def __init__(self, window):
         super().__init__()
         self.window = window
@@ -145,9 +145,9 @@ class ConnectedWidget(rawgui):
             vmax = self.horizontalSlider_2.value()
             mn = self.vbf_data.min()
             mx = self.vbf_data.max()
-            unit = (mx-mn)/100
-            climmin = mn+vmin*unit
-            climmax = mn+(vmax+1)*unit
+            unit = (mx - mn) / 100
+            climmin = mn + vmin * unit
+            climmax = mn + (vmax + 1) * unit
             try:
                 self.vbf_im.set_clim(climmin, climmax)
                 canvas = FigureCanvas(self.fig_vbf)
@@ -155,9 +155,7 @@ class ConnectedWidget(rawgui):
                 scene = QGraphicsScene()
                 scene.addWidget(canvas)
                 self.graphicsView_3.setScene(scene)
-                self.graphicsView_3.fitInView(
-                        scene.sceneRect(),
-                        )
+                self.graphicsView_3.fitInView(scene.sceneRect(),)
                 self.repaint_widget(self.graphicsView_3)
             except Exception as e:
                 logger.debug(f"Error: {e}")
@@ -175,15 +173,15 @@ class ConnectedWidget(rawgui):
         if self.checkBox_2.checkState():
             # we use self defined size
             start = self.spinBox_15.value()
-            frms = self.spinBox.value()*self.spinBox_2.value()
-            self.spinBox_16.setValue(start+frms-1)
+            frms = self.spinBox.value() * self.spinBox_2.value()
+            self.spinBox_16.setValue(start + frms - 1)
         else:
             # we use auto-size
             start = self.spinBox_15.value()
             frms = self.lineEdit_11.text()
             try:
                 dim = np.sqrt(int(frms))
-                self.spinBox_16.setValue(start+dim**2-1)
+                self.spinBox_16.setValue(start + dim ** 2 - 1)
             except Exception:
                 self.spinBox_16.setValue(0)
 
@@ -210,14 +208,12 @@ class ConnectedWidget(rawgui):
                 self.statusedit.setText(str(e))
 
     def openFileBrowser(self, fs):
-        path, okpres = QFileDialog.getOpenFileName(caption="Select file",
-                                                   filter=fs)
+        path, okpres = QFileDialog.getOpenFileName(caption="Select file", filter=fs)
         if okpres:
             return str(Path(path))
 
     def saveFileBrowser(self, fs):
-        path, okpres = QFileDialog.getSaveFileName(caption="Select file",
-                                                   filter=fs)
+        path, okpres = QFileDialog.getSaveFileName(caption="Select file", filter=fs)
         if okpres:
             return str(Path(path))
 
@@ -241,13 +237,13 @@ class ConnectedWidget(rawgui):
             "usels": self.checkBox_4.checkState(),
             "lsmin": self.spinBox_7.value(),
             "lsmax": self.spinBox_8.value(),
-            "usecoffset": self.checkBox.checkState()
+            "usecoffset": self.checkBox.checkState(),
         }
         vbfsettings = {
             "calcvbf": self.checkBox_10.checkState(),
             "vbfrad": self.spinBox_12.value(),
             "vbfxoffset": self.spinBox_13.value(),
-            "vbfyoffset": self.spinBox_14.value()
+            "vbfyoffset": self.spinBox_14.value(),
         }
         return path, improc, vbfsettings
 
@@ -267,9 +263,8 @@ class ConnectedWidget(rawgui):
             # (self.path_preview != path):
             self.update_line(self.statusedit, "Extracting frame...")
             self.original_preview = rec.getOriginalPreviewImage(
-                                            path, improc=improc,
-                                            vbfsettings=vbfsettings,
-                                            frame=framenum)
+                path, improc=improc, vbfsettings=vbfsettings, frame=framenum
+            )
             # update the path
             self.path_preview = path
             ois = self.original_preview.shape
@@ -277,36 +272,42 @@ class ConnectedWidget(rawgui):
             nis = filterframe.shape
             # check if the VBF aperture fits in the frame
             if vbfsettings["calcvbf"]:
-                midx = nis[1]//2
-                midy = nis[0]//2
+                midx = nis[1] // 2
+                midy = nis[0] // 2
                 xx = vbfsettings["vbfxoffset"]
                 yy = vbfsettings["vbfyoffset"]
                 rr = vbfsettings["vbfrad"]
-                if (midx+xx-rr < 0 or
-                   midx+xx+rr > nis[1] or
-                   midy+yy-rr < 0 or
-                   midy+yy-rr > nis[0]):
-                    raise Exception("Virtual bright field aperture out "
-                                    "of bounds")
+                if (
+                    midx + xx - rr < 0
+                    or midx + xx + rr > nis[1]
+                    or midy + yy - rr < 0
+                    or midy + yy - rr > nis[0]
+                ):
+                    raise Exception("Virtual bright field aperture out " "of bounds")
             # plot the image and the circle over it
             if self.fig_prev is not None:
                 plt.close(self.fig_prev)
-            self.fig_prev = plt.figure(frameon=False,
-                                       figsize=(filterframe.shape[1]/100,
-                                                filterframe.shape[0]/100))
+            self.fig_prev = plt.figure(
+                frameon=False,
+                figsize=(filterframe.shape[1] / 100, filterframe.shape[0] / 100),
+            )
             canvas = FigureCanvas(self.fig_prev)
-            ax = plt.Axes(self.fig_prev, [0., 0., 1., 1.])
+            ax = plt.Axes(self.fig_prev, [0.0, 0.0, 1.0, 1.0])
             ax.set_axis_off()
             self.fig_prev.add_axes(ax)
             ax.imshow(filterframe, cmap="Greys_r")
             if vbfsettings["calcvbf"]:
                 xoff = vbfsettings["vbfxoffset"]
                 yoff = vbfsettings["vbfyoffset"]
-                circ = Circle((filterframe.shape[1]//2+xoff,
-                               filterframe.shape[0]//2+yoff),
-                              vbfsettings["vbfrad"],
-                              color="red",
-                              alpha=0.5)
+                circ = Circle(
+                    (
+                        filterframe.shape[1] // 2 + xoff,
+                        filterframe.shape[0] // 2 + yoff,
+                    ),
+                    vbfsettings["vbfrad"],
+                    color="red",
+                    alpha=0.5,
+                )
                 ax.add_patch(circ)
             canvas.draw()
             scene = QGraphicsScene()
@@ -315,8 +316,10 @@ class ConnectedWidget(rawgui):
             self.graphicsView.fitInView(scene.sceneRect())
             self.repaint_widget(self.graphicsView)
             self.update_line(self.statusedit, "Succesfully created preview.")
-            self.update_line(self.lineEdit_8, f"Original: {ois[0]}x{ois[1]}. "
-                                              f"New: {nis[0]}x{nis[1]}.")
+            self.update_line(
+                self.lineEdit_8,
+                f"Original: {ois[0]}x{ois[1]}. " f"New: {nis[0]}x{nis[1]}.",
+            )
         except Exception as e:
             self.update_line(self.statusedit, f"Error: {e}")
             # empty the preview
@@ -340,8 +343,7 @@ class ConnectedWidget(rawgui):
         # open a savefile browser
         try:
             # read the gui info
-            (self.inpath, self.improc,
-             self.vbfsettings) = self.read_modsettings()
+            (self.inpath, self.improc, self.vbfsettings) = self.read_modsettings()
             if not self.inpath:
                 raise Exception("A TVIPS file must be selected!")
             self.oupath = self.saveFileBrowser("HDF5 (*.hdf5)")
@@ -400,8 +402,7 @@ class ConnectedWidget(rawgui):
 
     def write_to_hdf5(self):
         try:
-            (self.inpath, self.improc,
-             self.vbfsettings) = self.read_modsettings()
+            (self.inpath, self.improc, self.vbfsettings) = self.read_modsettings()
             if not self.inpath:
                 raise Exception("A TVIPS file must be selected!")
             self.oupath = self.lineEdit_2.text()
@@ -414,11 +415,15 @@ class ConnectedWidget(rawgui):
             improc = self.improc
             vbfsettings = self.vbfsettings
             start_frame, end_frame = self.image_range
-            self.get_thread = rec.Recorder(path,
-                                           improc=improc,
-                                           vbfsettings=vbfsettings,
-                                           outputpath=opath,
-                                           imrange=(start_frame, end_frame))
+            self.get_thread = rec.Recorder(
+                path,
+                improc=improc,
+                vbfsettings=vbfsettings,
+                outputpath=opath,
+                imrange=(start_frame, end_frame),
+                calcmax=self.checkBox_maxiumum_image.isChecked(),  # options kwarg
+                calcave=self.checkBox_average_image.isChecked(),  # options kwarg
+            )
             self.get_thread.increase_progress.connect(self.increase_progbar)
             self.get_thread.finish.connect(self.done_hdf5export)
             self.get_thread.start()
@@ -429,8 +434,7 @@ class ConnectedWidget(rawgui):
     def done_hdf5export(self):
         self.window.setEnabled(True)
         # also update lines in the second pannel
-        self.update_line(self.statusedit,
-                         "Succesfully exported to HDF5")
+        self.update_line(self.statusedit, "Succesfully exported to HDF5")
         # don't auto update, the gui may be before the file exists
         # self.update_line(self.lineEdit_4, self.lineEdit_2.text())
 
@@ -456,12 +460,10 @@ class ConnectedWidget(rawgui):
             else:
                 self.update_line(self.lineEdit_11, "?")
             if dim is not None:
-                self.update_line(self.lineEdit_12,
-                                 f"{str(int(dim))}x{str(int(dim))}")
+                self.update_line(self.lineEdit_12, f"{str(int(dim))}x{str(int(dim))}")
             else:
                 self.update_line(self.lineEdit_12, "?")
-            self.update_line(self.lineEdit_13,
-                             f"{str(imdimx)}x{str(imdimy)}")
+            self.update_line(self.lineEdit_13, f"{str(imdimx)}x{str(imdimy)}")
             self.update_final_frame()
             f.close()
         except Exception as e:
@@ -507,29 +509,35 @@ class ConnectedWidget(rawgui):
             else:
                 snakescan = False
             # calculate the image
-            logger.debug(f"We try to create a VBF image with data: "
-                         f"S.F. {start_frame}, E.F. {end_frame}, "
-                         f"Dims: x {sdimx} y {sdimy},"
-                         f"hyst: {hyst}")
-            self.vbf_data = f.get_vbf_image(sdimx, sdimy, start_frame,
-                                            end_frame, hyst, snakescan)
+            logger.debug(
+                f"We try to create a VBF image with data: "
+                f"S.F. {start_frame}, E.F. {end_frame}, "
+                f"Dims: x {sdimx} y {sdimy},"
+                f"hyst: {hyst}"
+            )
+            self.vbf_data = f.get_vbf_image(
+                sdimx, sdimy, start_frame, end_frame, hyst, snakescan
+            )
             logger.debug("Succesfully created the VBF array")
             # save the settings for later storage
-            self.vbf_sets = {"start_frame": start_frame,
-                             "end_frame": end_frame,
-                             "scan_dim_x": sdimx,
-                             "scan_dim_y": sdimy,
-                             "hysteresis": hyst,
-                             "winding_scan": snakescan}
+            self.vbf_sets = {
+                "start_frame": start_frame,
+                "end_frame": end_frame,
+                "scan_dim_x": sdimx,
+                "scan_dim_y": sdimy,
+                "hysteresis": hyst,
+                "winding_scan": snakescan,
+            }
             # plot the image and store it for further use. First close prior
             # image
             if self.fig_vbf is not None:
                 plt.close(self.fig_vbf)
-            self.fig_vbf = plt.figure(frameon=False,
-                                      figsize=(self.vbf_data.shape[1]/100,
-                                               self.vbf_data.shape[0]/100))
+            self.fig_vbf = plt.figure(
+                frameon=False,
+                figsize=(self.vbf_data.shape[1] / 100, self.vbf_data.shape[0] / 100),
+            )
             canvas = FigureCanvas(self.fig_vbf)
-            ax = plt.Axes(self.fig_vbf, [0., 0., 1., 1.])
+            ax = plt.Axes(self.fig_vbf, [0.0, 0.0, 1.0, 1.0])
             ax.set_axis_off()
             self.fig_vbf.add_axes(ax)
             self.vbf_im = ax.imshow(self.vbf_data, cmap="plasma")
@@ -588,31 +596,42 @@ class ConnectedWidget(rawgui):
             dp_scale = self.doubleSpinBox_3.value()
             # calculate the image
             filetyp = self.comboBox.currentText()
-            logger.debug(f"We try to create a {filetyp} file with data: "
-                         f"S.F. {start_frame}, E.F. {end_frame}, "
-                         f"Dims: x {sdimx} y {sdimy},"
-                         f"hyst: {hyst}, snakescan: {snakescan}")
+            logger.debug(
+                f"We try to create a {filetyp} file with data: "
+                f"S.F. {start_frame}, E.F. {end_frame}, "
+                f"Dims: x {sdimx} y {sdimy},"
+                f"hyst: {hyst}, snakescan: {snakescan}"
+            )
             logger.debug("Calculating shape and indexes")
 
             # xmin, xmax, ymin, ymax
-            crop = (self.spinBox_22.value(),
-                    self.spinBox_23.value(),
-                    self.spinBox_20.value(),
-                    self.spinBox_21.value(),
-                    )
-            shape, indexes = f.get_blo_export_data(sdimx, sdimy,
-                                                   start_frame,
-                                                   end_frame, hyst,
-                                                   snakescan, crop=crop)
+            crop = (
+                self.spinBox_22.value(),
+                self.spinBox_23.value(),
+                self.spinBox_20.value(),
+                self.spinBox_21.value(),
+            )
+            shape, indexes = f.get_blo_export_data(
+                sdimx, sdimy, start_frame, end_frame, hyst, snakescan, crop=crop
+            )
             logger.debug(f"Shape: {shape}")
             logger.debug(f"Starting to write {filetyp} file")
             self.update_line(self.statusedit, f"Writing {filetyp} file...")
             if filetyp == ".blo":
                 self.get_thread = blf.bloFileWriter(
-                        f, path_blo, shape, indexes, scan_scale, dp_scale)
+                    f,
+                    path_blo,
+                    shape,
+                    indexes,
+                    scan_scale,
+                    dp_scale,
+                    # if rescale button is checked do rescale, otherwise no rescaling selected
+                    rescale=self.checkBox_rescale.isChecked(),
+                )
             elif filetyp == ".hspy":
                 self.get_thread = hspf.hspyFileWriter(
-                        f, path_blo, shape, indexes, scan_scale, dp_scale)
+                    f, path_blo, shape, indexes, scan_scale, dp_scale
+                )
             else:
                 raise NotImplementedError("Unrecognized file type")
             self.get_thread.increase_progress.connect(self.increase_progbar)
@@ -625,8 +644,7 @@ class ConnectedWidget(rawgui):
     def done_bloexport(self):
         self.window.setEnabled(True)
         # also update lines in the second pannel
-        self.update_line(self.statusedit,
-                         "Succesfully exported to file")
+        self.update_line(self.statusedit, "Succesfully exported to file")
 
     def export_tiffs(self):
         path_hdf5 = self.lineEdit_4.text()
@@ -652,7 +670,7 @@ class ConnectedWidget(rawgui):
                 raise Exception("Unexpected dtype")
             if tot_frames <= last_frame:
                 raise Exception("Frames are out of range")
-            frames = np.arange(first_frame, last_frame+1)
+            frames = np.arange(first_frame, last_frame + 1)
             self.update_line(self.statusedit, "Exporting to tiff files...")
             self.get_thread = tfe.TiffFileWriter(f, frames, dtype, pre, fin)
             self.get_thread.increase_progress.connect(self.increase_progbar)
@@ -665,8 +683,7 @@ class ConnectedWidget(rawgui):
     def done_tiffexport(self):
         self.window.setEnabled(True)
         # also update lines in the second pannel
-        self.update_line(self.statusedit,
-                         "Succesfully exported Tiff files")
+        self.update_line(self.statusedit, "Succesfully exported Tiff files")
 
     def increase_progbar(self, value):
         self.progressBar.setValue(value)
@@ -682,33 +699,38 @@ class ConnectedWidget(rawgui):
         ymin = self.spinBox_20.value()
         ymax = self.spinBox_21.value()
         if not xmax - xmin > 0:
-            logger.warning('Not valid cropping dimensions: x.')
+            logger.warning("Not valid cropping dimensions: x.")
             return
         if not ymax - ymin > 0:
-            logger.warning('Not valid cropping dimensions: x.')
+            logger.warning("Not valid cropping dimensions: x.")
             return
 
         if self.fig_vbf is None:
-            logger.warning('No VBF figure plotted yet.')
+            logger.warning("No VBF figure plotted yet.")
             # no VBF figure plotted yet
             return
 
-        
-        label = 'crop_rect'
+        label = "crop_rect"
         try:
             # see if rectangle already plotted and just update
-            index = [i.get_label() for i in
-                     self.fig_vbf.axes[0].patches].index(label)
+            index = [i.get_label() for i in self.fig_vbf.axes[0].patches].index(label)
             rect = self.fig_vbf.axes[0].patches[index]
-            logger.info('Updating rectangle.')
+            logger.info("Updating rectangle.")
             rect.set_height(ymax - ymin)
             rect.set_width(xmax - xmin)
             rect.set_x(xmin)
             rect.set_y(ymin)
         except ValueError:
-            logger.info('Plotting rectangle.')
-            rect = plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
-                                 fill=False, ec='k', ls='dashed', label=label)
+            logger.info("Plotting rectangle.")
+            rect = plt.Rectangle(
+                (xmin, ymin),
+                xmax - xmin,
+                ymax - ymin,
+                fill=False,
+                ec="k",
+                ls="dashed",
+                label=label,
+            )
             self.fig_vbf.axes[0].add_patch(rect)
         self.fig_vbf.canvas.draw()
 
