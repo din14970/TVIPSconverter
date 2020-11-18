@@ -11,7 +11,7 @@ setup(
         "into other formats like .blo, .tiff and .hspy."
         "Mainly for orientation mapping (PED) or 4D STEM experiments."),
     url='https://github.com/din14970/TVIPSconverter',
-    author='Niels Cautaerts',
+    author='Niels Cautaerts, Paddy Harrison',
     author_email='nielscautaerts@hotmail.com',
     license='GPL-3.0',
     long_description=readme,
@@ -37,5 +37,6 @@ setup(
         'Pillow',
         'PyQt5>=5.13.2',
         'h5py>=2.10.0',
+        'scikit-image>=0.17.2',
     ],
 )
