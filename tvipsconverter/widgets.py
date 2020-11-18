@@ -12,6 +12,10 @@ from time import sleep
 import numpy as np
 import os
 
+# hotfix 3.9 MacOS Big Sur bug
+if sys.platform == 'darwin':
+    os.environ['QT_MAC_WANTS_LAYER'] = '1'
+
 from .utils import recorder as rec
 from .utils import blockfile as blf
 from .utils import tiffexport as tfe
