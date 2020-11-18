@@ -95,6 +95,10 @@ support loss-less export to hdf5. The GUI is also our addition.
 
 ## Changelog
 
+### 0.1.1
+* Added an option to crop the file along the scan directions
+* Added an option to limit the conversion between a set number of frames
+
 ### 0.1.0
 
 * It is now possible to export to Pyxem (Hyperspy) hdf5. The depth of the images is conserved.
