@@ -555,7 +555,7 @@ class Recorder(QThread):
                 center[1] - side // 2 : center[1] + side // 2,
             ]
             # blur crop and find maximum -> use as center location
-            blurred = gaussian_filter(crop, sigma)
+            blurred = gaussian_filter(crop, sigma, mode="nearest")
             # add crop offset (center - side//2) to get actual location on frame
             ds.attrs["Center location"] = np.unravel_index(
                 blurred.argmax(), crop.shape
