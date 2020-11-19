@@ -1,5 +1,6 @@
 ﻿import numpy as np
 import os.path
+from scipy.ndimage import gaussian_filter
 from tifffile import FileHandle
 import math
 import h5py
@@ -542,6 +543,23 @@ class Recorder(QThread):
                 ),
                 axis=0,
             ).sum(axis=0)
+
+        if (
+            "refine_center" in self.options and self.options["refine_center"][0]
+        ):  # make sure is checked
+            side, sigma = self.options["refine_center"][1:]
+            center = np.array(frame.shape) // 2
+
+            crop = frame[
+                center[0] - side // 2 : center[0] + side // 2,
+                center[1] - side // 2 : center[1] + side // 2,
+            ]
+            # blur crop and find maximum -> use as center location
+            blurred = gaussian_filter(crop, sigma)
+            # add crop offset (center - side//2) to get actual location on frame
+            ds.attrs["Center location"] = np.unravel_index(
+                blurred.argmax(), crop.shape
+            ) + (center - side // 2)
 
     def _update_gui_progess(self):
         """If using the GUI update features with progress"""
