@@ -153,6 +153,17 @@ def getOriginalPreviewImage(path, improc, vbfsettings, frame=0):
     return firstframe
 
 
+def write_scan_parameters_hdf5(path, **parameters):
+    """
+    Write parameters as attrs to a hdf5 file.
+
+    Parameters are written under h5['Scan'].attrs
+    """
+    with h5py.File(path, "r+") as f:
+        for key, val in parameters.items():
+            f["Scan"].attrs[key] = val
+
+
 class Recorder(QThread):
 
     increase_progress = pyqtSignal(int)
@@ -685,11 +696,21 @@ class hdf5Intermediate(h5py.File):
             logger.debug(f"final rotator index not found, error: {e}")
             finrot = None
         try:
-            dim = round(np.sqrt(finrot), 6)
-            if not dim == int(dim):
-                raise Exception
+            if (
+                "scan_dim_x" in self["Scan"].attrs
+                and "scan_dim_y" in self["Scan"].attrs
+            ):
+                dim = (
+                    self["Scan"].attrs["scan_dim_x"],
+                    self["Scan"].attrs["scan_dim_y"],
+                )
+
             else:
-                dim = int(dim)
+                dim = round(np.sqrt(finrot), 6)
+                if not dim == int(dim):
+                    raise Exception
+                else:
+                    dim = int(dim)
         except Exception:
             logger.debug("Could not calculate scan dimensions")
             dim = None
