@@ -833,7 +833,9 @@ class hdf5Intermediate(h5py.File):
                         and xmax < sdimx
                         and ymax < sdimy
                     ):
-                        sel = sel[ymin:ymax, xmin:xmax]
+                        sel = sel[
+                            ymin : ymax + 1, xmin : xmax + 1
+                        ]  # +1 to include final frame
                     else:
                         logger.warning(
                             "Aborting crop due to incorrect given dimensions: {}".format(
