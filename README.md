@@ -88,12 +88,19 @@ supply the scan information manually.
 ## Credits and notes
 
 **This tool is not an official product of the TVIPS company. Use at your own risk. 
-I am not responsbile for loss or corruption of data.** The tool derives from python scripts
+We are not responsbile for loss or corruption of data.** The tool derives from python scripts
 originally developed by the company. We have significantly modified these
 scripts mainly to make the conversion process possible on a computer with regular sized RAM and
 support loss-less export to hdf5. The GUI is also our addition.
 
 ## Changelog
+
+### 0.1.2
+* calculate and store direct beam positions in the HDF5 file
+* calculate mean and maximum images
+* added choice in how to bin the data
+* more options on export image depth
+* bugfixes
 
 ### 0.1.1
 * Added an option to crop the file along the scan directions

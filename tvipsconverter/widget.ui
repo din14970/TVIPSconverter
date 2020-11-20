@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1171</width>
-    <height>755</height>
+    <height>1003</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -32,6 +32,22 @@
       <string>Progress</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
+      <item row="2" column="0">
+       <widget class="QLineEdit" name="statusedit">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="text">
+         <string>Status: Idle</string>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
       <item row="1" column="0">
        <widget class="QProgressBar" name="progressBar">
         <property name="sizePolicy">
@@ -51,22 +67,6 @@
         </property>
        </widget>
       </item>
-      <item row="2" column="0">
-       <widget class="QLineEdit" name="statusedit">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="text">
-         <string>Status: Idle</string>
-        </property>
-        <property name="readOnly">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
      </layout>
     </widget>
    </item>
@@ -82,7 +82,7 @@
       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
@@ -156,8 +156,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>1100</width>
-            <height>643</height>
+            <width>1115</width>
+            <height>780</height>
            </rect>
           </property>
           <layout class="QHBoxLayout" name="horizontalLayout_11">
@@ -284,6 +284,41 @@
                       <property name="value">
                        <number>4</number>
                       </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QGroupBox" name="groupBox_10">
+                      <property name="title">
+                       <string>Binning Type</string>
+                      </property>
+                      <layout class="QFormLayout" name="formLayout">
+                       <item row="0" column="0">
+                        <widget class="QRadioButton" name="radioButton_average">
+                         <property name="toolTip">
+                          <string>Use box averaging where the box size is the binning factor.</string>
+                         </property>
+                         <property name="text">
+                          <string>Box Average</string>
+                         </property>
+                         <property name="checked">
+                          <bool>true</bool>
+                         </property>
+                         <attribute name="buttonGroup">
+                          <string notr="true">buttonGroup</string>
+                         </attribute>
+                        </widget>
+                       </item>
+                       <item row="0" column="1">
+                        <widget class="QRadioButton" name="radioButton_decimation">
+                         <property name="text">
+                          <string>Decimation</string>
+                         </property>
+                         <attribute name="buttonGroup">
+                          <string notr="true">buttonGroup</string>
+                         </attribute>
+                        </widget>
+                       </item>
+                      </layout>
                      </widget>
                     </item>
                     <item>
@@ -686,6 +721,101 @@
                </widget>
               </item>
               <item>
+               <widget class="QGroupBox" name="groupBox_8">
+                <property name="title">
+                 <string>Other calculations</string>
+                </property>
+                <layout class="QGridLayout" name="gridLayout_10">
+                 <item row="0" column="0">
+                  <widget class="QCheckBox" name="checkBox_maxiumum_image">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The maximum diffraction pattern represents the maximum intensity at each diffraction pattern pixel for all scanning positions. It is therefore instructive to the diffraction intensities recorded.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Calculate maximum diffraction pattern</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="4">
+                  <widget class="QSpinBox" name="spinBox_refine_center_sigma">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sigma should be set at least as large as the direct beam disk radius to accurately find the center point.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="value">
+                    <number>5</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="3">
+                  <widget class="QLabel" name="label_41">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sigma should be set at least as large as the direct beam disk radius to accurately find the center point.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Sigma</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QCheckBox" name="checkBox_refine_center">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The direct beam location will be refined and stored as metadata for each frame. This is done by blurring (sigma) a small central region (of diameter box size) and finding the peak position. Therefore box size should be large enough to encompass the direct beam entirely for all scnning pixels and sigma should be at least the disk radius.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Refine direct beam position</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="1">
+                  <widget class="QLabel" name="label_40">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Diameter of the bo in which the direct beam spot will be found for all scanning positions.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Box size</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="2">
+                  <widget class="QSpinBox" name="spinBox_refine_center_diameter">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Diameter of the bo in which the direct beam spot will be found for all scanning positions.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="value">
+                    <number>50</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0" colspan="5">
+                  <widget class="Line" name="line">
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1" colspan="4">
+                  <widget class="QCheckBox" name="checkBox_average_image">
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The average diffraction pattern represents the average intensity at each diffraction pattern pixel for all scanning positions. It is therefore instructive to the average diffraction over the whole scanning area.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                   <property name="text">
+                    <string>Calculate average diffraction pattern</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
                <spacer name="verticalSpacer">
                 <property name="orientation">
                  <enum>Qt::Vertical</enum>
@@ -1026,6 +1156,9 @@
           <layout class="QVBoxLayout" name="verticalLayout_9">
            <item>
             <widget class="QScrollArea" name="scrollArea_2">
+             <property name="verticalScrollBarPolicy">
+              <enum>Qt::ScrollBarAlwaysOn</enum>
+             </property>
              <property name="widgetResizable">
               <bool>true</bool>
              </property>
@@ -1034,8 +1167,8 @@
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>1054</width>
-                <height>610</height>
+                <width>1069</width>
+                <height>628</height>
                </rect>
               </property>
               <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -1125,27 +1258,6 @@
                      <string>Scaling</string>
                     </property>
                     <layout class="QGridLayout" name="gridLayout_5">
-                     <item row="4" column="0">
-                      <widget class="QLabel" name="label_33">
-                       <property name="text">
-                        <string>Scale of DP</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="0" column="0">
-                      <widget class="QLabel" name="label_14">
-                       <property name="text">
-                        <string>Scale of scan</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="0" column="2">
-                      <widget class="QLabel" name="label_35">
-                       <property name="text">
-                        <string>nm / pixel</string>
-                       </property>
-                      </widget>
-                     </item>
                      <item row="4" column="2">
                       <widget class="QLabel" name="label_34">
                        <property name="text">
@@ -1153,13 +1265,10 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="4" column="1">
-                      <widget class="QDoubleSpinBox" name="doubleSpinBox_3">
-                       <property name="decimals">
-                        <number>4</number>
-                       </property>
-                       <property name="value">
-                        <double>1.000000000000000</double>
+                     <item row="0" column="0">
+                      <widget class="QLabel" name="label_14">
+                       <property name="text">
+                        <string>Scale of scan</string>
                        </property>
                       </widget>
                      </item>
@@ -1189,6 +1298,30 @@
                        </property>
                       </spacer>
                      </item>
+                     <item row="0" column="2">
+                      <widget class="QLabel" name="label_35">
+                       <property name="text">
+                        <string>nm / pixel</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="4" column="0">
+                      <widget class="QLabel" name="label_33">
+                       <property name="text">
+                        <string>Scale of DP</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="4" column="1">
+                      <widget class="QDoubleSpinBox" name="doubleSpinBox_3">
+                       <property name="decimals">
+                        <number>4</number>
+                       </property>
+                       <property name="value">
+                        <double>1.000000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
                     </layout>
                    </widget>
                   </item>
@@ -1207,94 +1340,24 @@
                      <string>Scan modification</string>
                     </property>
                     <layout class="QGridLayout" name="gridLayout_6">
-                     <item row="6" column="3">
-                      <widget class="QLabel" name="label_27">
-                       <property name="sizePolicy">
-                        <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-                         <horstretch>0</horstretch>
-                         <verstretch>0</verstretch>
-                        </sizepolicy>
-                       </property>
-                       <property name="text">
-                        <string>pixels</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="1" column="3">
-                      <widget class="QLabel" name="label_6">
-                       <property name="enabled">
-                        <bool>true</bool>
-                       </property>
-                       <property name="sizePolicy">
-                        <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-                         <horstretch>0</horstretch>
-                         <verstretch>0</verstretch>
-                        </sizepolicy>
-                       </property>
+                     <item row="7" column="0">
+                      <widget class="QCheckBox" name="checkBox_12">
                        <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of scan points in the Y direction&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In EM Konos, the scanning follows a winding scan pattern (check on), whereas in EM Scan it uses normal flyback scan (check off)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                        </property>
                        <property name="text">
-                        <string>Scan dim. Y</string>
+                        <string>Winding scan?</string>
                        </property>
-                      </widget>
-                     </item>
-                     <item row="6" column="1">
-                      <widget class="QSpinBox" name="spinBox_9">
-                       <property name="enabled">
+                       <property name="checkable">
                         <bool>true</bool>
                        </property>
-                       <property name="sizePolicy">
-                        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                         <horstretch>0</horstretch>
-                         <verstretch>0</verstretch>
-                        </sizepolicy>
-                       </property>
-                       <property name="minimumSize">
-                        <size>
-                         <width>93</width>
-                         <height>0</height>
-                        </size>
-                       </property>
-                       <property name="minimum">
-                        <number>-100000000</number>
-                       </property>
-                       <property name="maximum">
-                        <number>100000000</number>
-                       </property>
-                       <property name="value">
-                        <number>5</number>
+                       <property name="checked">
+                        <bool>false</bool>
                        </property>
                       </widget>
                      </item>
-                     <item row="3" column="1">
-                      <widget class="QSpinBox" name="spinBox_15">
-                       <property name="maximum">
-                        <number>100000000</number>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="1" column="0">
-                      <widget class="QLabel" name="label_2">
-                       <property name="enabled">
-                        <bool>true</bool>
-                       </property>
-                       <property name="sizePolicy">
-                        <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-                         <horstretch>0</horstretch>
-                         <verstretch>0</verstretch>
-                        </sizepolicy>
-                       </property>
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of scan points in the x direction&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
-                       <property name="text">
-                        <string>Scan dim. X</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="1" column="1">
-                      <widget class="QSpinBox" name="spinBox">
+                     <item row="1" column="4">
+                      <widget class="QSpinBox" name="spinBox_2">
                        <property name="enabled">
                         <bool>true</bool>
                        </property>
@@ -1340,8 +1403,42 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="1" column="4">
-                      <widget class="QSpinBox" name="spinBox_2">
+                     <item row="3" column="1">
+                      <widget class="QSpinBox" name="spinBox_15">
+                       <property name="maximum">
+                        <number>100000000</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="0">
+                      <widget class="QLabel" name="label_3">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Frame in the stream where the scan began&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="text">
+                        <string>Scan start frame</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="0" colspan="7">
+                      <widget class="QCheckBox" name="checkBox_2">
+                       <property name="text">
+                        <string>Use custom scan dimensions</string>
+                       </property>
+                       <property name="checked">
+                        <bool>false</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="0" colspan="5">
+                      <widget class="QCheckBox" name="checkBox_11">
+                       <property name="text">
+                        <string>Use custom scan frames</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="1">
+                      <widget class="QSpinBox" name="spinBox">
                        <property name="enabled">
                         <bool>true</bool>
                        </property>
@@ -1371,6 +1468,25 @@
                        </property>
                       </widget>
                      </item>
+                     <item row="1" column="3">
+                      <widget class="QLabel" name="label_6">
+                       <property name="enabled">
+                        <bool>true</bool>
+                       </property>
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
+                       </property>
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of scan points in the Y direction&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="text">
+                        <string>Scan dim. Y</string>
+                       </property>
+                      </widget>
+                     </item>
                      <item row="6" column="0">
                       <widget class="QCheckBox" name="checkBox_6">
                        <property name="toolTip">
@@ -1381,23 +1497,6 @@
                        </property>
                        <property name="checked">
                         <bool>false</bool>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="3" column="0">
-                      <widget class="QLabel" name="label_3">
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Frame in the stream where the scan began&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
-                       <property name="text">
-                        <string>Scan start frame</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="2" column="0" colspan="5">
-                      <widget class="QCheckBox" name="checkBox_11">
-                       <property name="text">
-                        <string>Use custom scan frames</string>
                        </property>
                       </widget>
                      </item>
@@ -1414,19 +1513,50 @@
                        </property>
                       </spacer>
                      </item>
-                     <item row="7" column="0">
-                      <widget class="QCheckBox" name="checkBox_12">
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In EM Konos, the scanning follows a winding scan pattern (check on), whereas in EM Scan it uses normal flyback scan (check off)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
-                       <property name="text">
-                        <string>Winding scan?</string>
-                       </property>
-                       <property name="checkable">
+                     <item row="6" column="1">
+                      <widget class="QSpinBox" name="spinBox_9">
+                       <property name="enabled">
                         <bool>true</bool>
                        </property>
-                       <property name="checked">
-                        <bool>false</bool>
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
+                       </property>
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="minimum">
+                        <number>-100000000</number>
+                       </property>
+                       <property name="maximum">
+                        <number>100000000</number>
+                       </property>
+                       <property name="value">
+                        <number>5</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="label_2">
+                       <property name="enabled">
+                        <bool>true</bool>
+                       </property>
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
+                       </property>
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of scan points in the x direction&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="text">
+                        <string>Scan dim. X</string>
                        </property>
                       </widget>
                      </item>
@@ -1440,13 +1570,16 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="0" column="0" colspan="7">
-                      <widget class="QCheckBox" name="checkBox_2">
-                       <property name="text">
-                        <string>Use custom scan dimensions</string>
+                     <item row="6" column="3">
+                      <widget class="QLabel" name="label_27">
+                       <property name="sizePolicy">
+                        <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+                         <horstretch>0</horstretch>
+                         <verstretch>0</verstretch>
+                        </sizepolicy>
                        </property>
-                       <property name="checked">
-                        <bool>false</bool>
+                       <property name="text">
+                        <string>pixels</string>
                        </property>
                       </widget>
                      </item>
@@ -1455,35 +1588,18 @@
                   </item>
                   <item>
                    <widget class="QGroupBox" name="groupBox_9">
+                    <property name="toolTip">
+                     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                    </property>
                     <property name="title">
                      <string>Crop</string>
                     </property>
                     <layout class="QGridLayout" name="gridLayout_11">
-                     <item row="1" column="0">
-                      <widget class="QLabel" name="label_37">
-                       <property name="text">
-                        <string>ymin</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="0" column="4">
-                      <widget class="QSpinBox" name="spinBox_23">
-                       <property name="minimumSize">
-                        <size>
-                         <width>93</width>
-                         <height>0</height>
-                        </size>
-                       </property>
-                       <property name="maximum">
-                        <number>1000</number>
-                       </property>
-                       <property name="value">
-                        <number>100</number>
-                       </property>
-                      </widget>
-                     </item>
                      <item row="0" column="0">
                       <widget class="QLabel" name="label_36">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
                        <property name="text">
                         <string>xmin</string>
                        </property>
@@ -1497,6 +1613,9 @@
                          <height>0</height>
                         </size>
                        </property>
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
                        <property name="maximum">
                         <number>1000</number>
                        </property>
@@ -1505,28 +1624,111 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="1" column="5">
+                     <item row="0" column="2">
+                      <widget class="QSpinBox" name="spinBox_22">
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="maximum">
+                        <number>1000</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="6">
                       <widget class="QPushButton" name="pushButton_13">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
                        <property name="text">
                         <string>Show Cropped Region</string>
                        </property>
                       </widget>
                      </item>
-                     <item row="1" column="3">
-                      <widget class="QLabel" name="label_39">
+                     <item row="0" column="4">
+                      <widget class="QSpinBox" name="spinBox_23">
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="maximum">
+                        <number>1000</number>
+                       </property>
+                       <property name="value">
+                        <number>100</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="label_37">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
                        <property name="text">
-                        <string>ymax</string>
+                        <string>ymin</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="2">
+                      <widget class="QSpinBox" name="spinBox_20">
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="minimum">
+                        <number>0</number>
+                       </property>
+                       <property name="maximum">
+                        <number>1000</number>
+                       </property>
+                       <property name="value">
+                        <number>0</number>
                        </property>
                       </widget>
                      </item>
                      <item row="0" column="3">
                       <widget class="QLabel" name="label_38">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
                        <property name="text">
                         <string>xmax</string>
                        </property>
                       </widget>
                      </item>
-                     <item row="0" column="5">
+                     <item row="1" column="3">
+                      <widget class="QLabel" name="label_39">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="text">
+                        <string>ymax</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="5">
+                      <widget class="QCheckBox" name="checkBox_apply_crop">
+                       <property name="text">
+                        <string>Apply crop?</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="5" colspan="2">
                       <spacer name="horizontalSpacer_14">
                        <property name="orientation">
                         <enum>Qt::Horizontal</enum>
@@ -1539,35 +1741,35 @@
                        </property>
                       </spacer>
                      </item>
-                     <item row="0" column="2">
-                      <widget class="QSpinBox" name="spinBox_22">
-                       <property name="minimumSize">
+                    </layout>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QGroupBox" name="groupBox_12">
+                    <property name="title">
+                     <string>8-bit conversion</string>
+                    </property>
+                    <layout class="QGridLayout" name="gridLayout_12">
+                     <item row="0" column="1">
+                      <spacer name="horizontalSpacer_15">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
                         <size>
-                         <width>93</width>
-                         <height>0</height>
+                         <width>40</width>
+                         <height>20</height>
                         </size>
                        </property>
-                       <property name="maximum">
-                        <number>1000</number>
-                       </property>
-                      </widget>
+                      </spacer>
                      </item>
-                     <item row="1" column="2">
-                      <widget class="QSpinBox" name="spinBox_20">
-                       <property name="minimumSize">
-                        <size>
-                         <width>93</width>
-                         <height>0</height>
-                        </size>
+                     <item row="0" column="0">
+                      <widget class="QCheckBox" name="checkBox_rescale">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If checked then the intensities in each frame will be rescaled between 0 and 255.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                        </property>
-                       <property name="minimum">
-                        <number>0</number>
-                       </property>
-                       <property name="maximum">
-                        <number>1000</number>
-                       </property>
-                       <property name="value">
-                        <number>0</number>
+                       <property name="text">
+                        <string>Rescale intensities across 8-bit range</string>
                        </property>
                       </widget>
                      </item>
@@ -1643,19 +1845,6 @@
                      <string>Display settings</string>
                     </property>
                     <layout class="QGridLayout" name="gridLayout_4">
-                     <item row="1" column="1">
-                      <widget class="QSlider" name="horizontalSlider">
-                       <property name="maximum">
-                        <number>255</number>
-                       </property>
-                       <property name="pageStep">
-                        <number>10</number>
-                       </property>
-                       <property name="orientation">
-                        <enum>Qt::Horizontal</enum>
-                       </property>
-                      </widget>
-                     </item>
                      <item row="2" column="1">
                       <widget class="QSlider" name="horizontalSlider_2">
                        <property name="value">
@@ -1666,6 +1855,13 @@
                        </property>
                       </widget>
                      </item>
+                     <item row="2" column="0">
+                      <widget class="QLabel" name="label_25">
+                       <property name="text">
+                        <string>Maximum</string>
+                       </property>
+                      </widget>
+                     </item>
                      <item row="1" column="0">
                       <widget class="QLabel" name="label_24">
                        <property name="text">
@@ -1673,10 +1869,16 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="2" column="0">
-                      <widget class="QLabel" name="label_25">
-                       <property name="text">
-                        <string>Maximum</string>
+                     <item row="1" column="1">
+                      <widget class="QSlider" name="horizontalSlider">
+                       <property name="maximum">
+                        <number>255</number>
+                       </property>
+                       <property name="pageStep">
+                        <number>10</number>
+                       </property>
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
                        </property>
                       </widget>
                      </item>
@@ -1989,4 +2191,7 @@
  </widget>
  <resources/>
  <connections/>
+ <buttongroups>
+  <buttongroup name="buttonGroup"/>
+ </buttongroups>
 </ui>

@@ -9,6 +9,8 @@ Dummy
 garbage
 .ipynb*
 .venvtest
+.DS_STORE
+.DS_Store
 
 # Created by https://www.gitignore.io/api/python
 # Edit at https://www.gitignore.io/?templates=python
@@ -118,4 +120,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# vs code
+.vscode/
+
+
 # End of https://www.gitignore.io/api/python
+.vscode/settings.json
