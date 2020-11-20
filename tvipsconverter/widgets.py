@@ -174,8 +174,8 @@ class ConnectedWidget(rawgui):
         # update x, y crop box values
         self.spinBox_22.setValue(0)
         self.spinBox_20.setValue(0)
-        self.spinBox_23.setValue(self.spinBox.value() - 1)
-        self.spinBox_21.setValue(self.spinBox_2.value() - 1)
+        self.spinBox_23.setValue(self.spinBox.value())
+        self.spinBox_21.setValue(self.spinBox_2.value())
 
         if self.checkBox_2.checkState():
             # we use self defined size
@@ -632,13 +632,20 @@ class ConnectedWidget(rawgui):
             )
             logger.debug("Calculating shape and indexes")
 
-            # xmin, xmax, ymin, ymax
-            crop = (
-                self.spinBox_22.value(),
-                self.spinBox_23.value(),
-                self.spinBox_20.value(),
-                self.spinBox_21.value(),
-            )
+            # check crop desired
+            if self.checkBox_apply_crop.isChecked():
+                # check crop valid
+                if self.check_crop_limits() is None:
+                    self.update_line(
+                        self.statusedit,
+                        f"File not exported, please check cropping limits.",
+                    )
+                    return
+                # get crop
+                crop = self.get_crop_limits()
+            else:
+                crop = None
+
             shape, indexes = f.get_blo_export_data(
                 sdimx, sdimy, start_frame, end_frame, hyst, snakescan, crop=crop
             )
@@ -720,22 +727,70 @@ class ConnectedWidget(rawgui):
         self.window.hide()
         self.window.show()
 
-    def show_cropped_region(self):
-        # check for validity of cropped region
+    def remove_cropped_region(self):
+        # try to remove if it is there
+        label = "crop_rect"
+        try:
+            # see if rectangle already plotted and just update
+            index = [i.get_label() for i in self.fig_vbf.axes[0].patches].index(label)
+            rect = self.fig_vbf.axes[0].patches[index]
+            rect.remove()
+            self.fig_vbf.canvas.draw()
+        except ValueError:
+            logger.info("No crop rectange drawn.")
+
+    def get_crop_limits(self):
         xmin = self.spinBox_22.value()
         xmax = self.spinBox_23.value()
         ymin = self.spinBox_20.value()
         ymax = self.spinBox_21.value()
-        if not xmax - xmin > 0:
-            logger.warning("Not valid cropping dimensions: x.")
-            return
-        if not ymax - ymin > 0:
-            logger.warning("Not valid cropping dimensions: x.")
+
+        return xmin, xmax, ymin, ymax
+
+    def check_crop_limits(self):
+        xmin, xmax, ymin, ymax = self.get_crop_limits()
+
+        # check scan boundaries, returns None if any test fails
+        if (
+            xmin < 0
+            or ymin < 0
+            or not xmax <= self.spinBox.value()
+            or not ymax <= self.spinBox_2.value()
+        ):
+            self.update_line(
+                self.statusedit, "Crop limits should be within scan bounds."
+            )
+            self.remove_cropped_region()
             return
 
+        # check cropping dimension > 0
+        if not xmax - xmin > 0:
+            self.update_line(
+                self.statusedit, f"Crop dimension incorrect. Crop x: {xmax - xmin}.",
+            )
+            self.remove_cropped_region()
+            return
+        if not ymax - ymin > 0:
+            self.update_line(
+                self.statusedit, f"Crop dimension incorrect. Crop y: {ymax - ymin}.",
+            )
+            self.remove_cropped_region()
+            return
+
+        # return non-None if passes checks
+        return True
+
+    def show_cropped_region(self):
+        if self.check_crop_limits() is None:
+            return
+
+        # check for validity of cropped region
+        xmin, xmax, ymin, ymax = self.get_crop_limits()
+
         if self.fig_vbf is None:
-            logger.warning("No VBF figure plotted yet.")
-            # no VBF figure plotted yet
+            self.update_line(
+                self.statusedit, "No VBF figure plotted yet.",
+            )
             return
 
         label = "crop_rect"
@@ -761,6 +816,10 @@ class ConnectedWidget(rawgui):
             )
             self.fig_vbf.axes[0].add_patch(rect)
         self.fig_vbf.canvas.draw()
+
+        self.update_line(
+            self.statusedit, f"Crop dimensions (x, y): ({xmax - xmin}, {ymax - ymin}).",
+        )
 
 
 def main():

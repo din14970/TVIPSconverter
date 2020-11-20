@@ -1595,7 +1595,52 @@
                      <string>Crop</string>
                     </property>
                     <layout class="QGridLayout" name="gridLayout_11">
-                     <item row="1" column="5">
+                     <item row="0" column="0">
+                      <widget class="QLabel" name="label_36">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="text">
+                        <string>xmin</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="4">
+                      <widget class="QSpinBox" name="spinBox_21">
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="maximum">
+                        <number>1000</number>
+                       </property>
+                       <property name="value">
+                        <number>100</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="2">
+                      <widget class="QSpinBox" name="spinBox_22">
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="maximum">
+                        <number>1000</number>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="6">
                       <widget class="QPushButton" name="pushButton_13">
                        <property name="toolTip">
                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -1605,13 +1650,22 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="0" column="0">
-                      <widget class="QLabel" name="label_36">
+                     <item row="0" column="4">
+                      <widget class="QSpinBox" name="spinBox_23">
+                       <property name="minimumSize">
+                        <size>
+                         <width>93</width>
+                         <height>0</height>
+                        </size>
+                       </property>
                        <property name="toolTip">
                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                        </property>
-                       <property name="text">
-                        <string>xmin</string>
+                       <property name="maximum">
+                        <number>1000</number>
+                       </property>
+                       <property name="value">
+                        <number>100</number>
                        </property>
                       </widget>
                      </item>
@@ -1647,25 +1701,6 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="1" column="4">
-                      <widget class="QSpinBox" name="spinBox_21">
-                       <property name="minimumSize">
-                        <size>
-                         <width>93</width>
-                         <height>0</height>
-                        </size>
-                       </property>
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
-                       <property name="maximum">
-                        <number>1000</number>
-                       </property>
-                       <property name="value">
-                        <number>100</number>
-                       </property>
-                      </widget>
-                     </item>
                      <item row="0" column="3">
                       <widget class="QLabel" name="label_38">
                        <property name="toolTip">
@@ -1675,19 +1710,6 @@
                         <string>xmax</string>
                        </property>
                       </widget>
-                     </item>
-                     <item row="0" column="5">
-                      <spacer name="horizontalSpacer_14">
-                       <property name="orientation">
-                        <enum>Qt::Horizontal</enum>
-                       </property>
-                       <property name="sizeHint" stdset="0">
-                        <size>
-                         <width>40</width>
-                         <height>20</height>
-                        </size>
-                       </property>
-                      </spacer>
                      </item>
                      <item row="1" column="3">
                       <widget class="QLabel" name="label_39">
@@ -1699,40 +1721,25 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="0" column="4">
-                      <widget class="QSpinBox" name="spinBox_23">
-                       <property name="minimumSize">
-                        <size>
-                         <width>93</width>
-                         <height>0</height>
-                        </size>
-                       </property>
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
-                       <property name="maximum">
-                        <number>1000</number>
-                       </property>
-                       <property name="value">
-                        <number>100</number>
+                     <item row="1" column="5">
+                      <widget class="QCheckBox" name="checkBox_apply_crop">
+                       <property name="text">
+                        <string>Apply crop?</string>
                        </property>
                       </widget>
                      </item>
-                     <item row="0" column="2">
-                      <widget class="QSpinBox" name="spinBox_22">
-                       <property name="minimumSize">
+                     <item row="0" column="5" colspan="2">
+                      <spacer name="horizontalSpacer_14">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
                         <size>
-                         <width>93</width>
-                         <height>0</height>
+                         <width>40</width>
+                         <height>20</height>
                         </size>
                        </property>
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Crop the output file size. Only the pixels within the crop bounds will be exported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
-                       <property name="maximum">
-                        <number>1000</number>
-                       </property>
-                      </widget>
+                      </spacer>
                      </item>
                     </layout>
                    </widget>

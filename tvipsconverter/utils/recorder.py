@@ -828,12 +828,10 @@ class hdf5Intermediate(h5py.File):
                 raise Exception("Final frame is out of bounds")
             if end_frame <= start_frame:
                 raise Exception(
-                    "Final frame index must be larger than " "first frame index"
+                    "Final frame index must be larger than first frame index"
                 )
             if end_frame + 1 - start_frame != sdimx * sdimy:
-                raise Exception(
-                    "Number of custom frames does not match " "scan dimension"
-                )
+                raise Exception("Number of custom frames does not match scan dimension")
             # just create an index array
             sel = np.arange(start_frame, end_frame + 1)
             sel = sel.reshape(sdimy, sdimx)
@@ -854,9 +852,7 @@ class hdf5Intermediate(h5py.File):
                         and xmax < sdimx
                         and ymax < sdimy
                     ):
-                        sel = sel[
-                            ymin : ymax + 1, xmin : xmax + 1
-                        ]  # +1 to include final frame
+                        sel = sel[ymin:ymax, xmin:xmax]  # +1 to include final frame
                     else:
                         logger.warning(
                             "Aborting crop due to incorrect given dimensions: {}".format(
