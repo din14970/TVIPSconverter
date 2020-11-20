@@ -117,6 +117,10 @@ class ConnectedWidget(rawgui):
         self.pushButton_11.clicked.connect(self.export_tiffs)
         # show cropped region
         self.pushButton_13.clicked.connect(self.show_cropped_region)
+        # write scan settings (from VBF preview) to hdf5
+        # self.pushButton_write_scan_parameters.clicked.connect(
+        #     self.write_scan_parameters_hdf5
+        # )
 
     def export_preview(self):
         try:
@@ -427,6 +431,11 @@ class ConnectedWidget(rawgui):
                 imrange=(start_frame, end_frame),
                 calcmax=self.checkBox_maxiumum_image.isChecked(),  # options kwarg
                 calcave=self.checkBox_average_image.isChecked(),  # options kwarg
+                refine_center=(
+                    self.checkBox_refine_center.isChecked(),
+                    self.spinBox_refine_center_diameter.value(),
+                    self.spinBox_refine_center_sigma.value(),
+                ),
             )
             self.get_thread.increase_progress.connect(self.increase_progbar)
             self.get_thread.finish.connect(self.done_hdf5export)
@@ -453,6 +462,9 @@ class ConnectedWidget(rawgui):
                 self.update_line(self.lineEdit_3, "?")
             if star is not None:
                 self.update_line(self.lineEdit_5, str(star))
+                logger.info(f"start: {star}")
+                self.spinBox_15.setValue(star)
+                self.checkBox_11.setChecked(True)
             else:
                 self.update_line(self.lineEdit_5, "?")
             if en is not None:
@@ -464,7 +476,15 @@ class ConnectedWidget(rawgui):
             else:
                 self.update_line(self.lineEdit_11, "?")
             if dim is not None:
-                self.update_line(self.lineEdit_12, f"{str(int(dim))}x{str(int(dim))}")
+                if isinstance(dim, (list, tuple)):
+                    self.update_line(self.lineEdit_12, str(dim))
+                    self.spinBox.setValue(dim[0])
+                    self.spinBox_2.setValue(dim[1])
+                    self.checkBox_2.setChecked(True)
+                else:
+                    self.update_line(
+                        self.lineEdit_12, f"{str(int(dim))}x{str(int(dim))}"
+                    )
             else:
                 self.update_line(self.lineEdit_12, "?")
             self.update_line(self.lineEdit_13, f"{str(imdimx)}x{str(imdimy)}")
@@ -532,6 +552,7 @@ class ConnectedWidget(rawgui):
                 "hysteresis": hyst,
                 "winding_scan": snakescan,
             }
+
             # plot the image and store it for further use. First close prior
             # image
             if self.fig_vbf is not None:
@@ -556,6 +577,9 @@ class ConnectedWidget(rawgui):
             yshap, xshap = self.vbf_data.shape
             self.update_line(self.lineEdit_10, f"Size: {xshap}x{yshap}.")
             f.close()
+
+            # add settings to hdf5 file, do this after file close
+            rec.write_scan_parameters_hdf5(path_hdf5, **self.vbf_sets)
         except Exception as e:
             self.update_line(self.statusedit, f"Error: {e}")
 

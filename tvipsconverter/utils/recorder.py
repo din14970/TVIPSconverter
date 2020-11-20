@@ -1,5 +1,6 @@
 ﻿import numpy as np
 import os.path
+from scipy.ndimage import gaussian_filter
 from tifffile import FileHandle
 import math
 import h5py
@@ -150,6 +151,17 @@ def getOriginalPreviewImage(path, improc, vbfsettings, frame=0):
     rec = Recorder(path, improc=improc, vbfsettings=vbfsettings)
     firstframe = rec.read_frame(frame)
     return firstframe
+
+
+def write_scan_parameters_hdf5(path, **parameters):
+    """
+    Write parameters as attrs to a hdf5 file.
+
+    Parameters are written under h5['Scan'].attrs
+    """
+    with h5py.File(path, "r+") as f:
+        for key, val in parameters.items():
+            f["Scan"].attrs[key] = val
 
 
 class Recorder(QThread):
@@ -543,6 +555,23 @@ class Recorder(QThread):
                 axis=0,
             ).sum(axis=0)
 
+        if (
+            "refine_center" in self.options and self.options["refine_center"][0]
+        ):  # make sure is checked
+            side, sigma = self.options["refine_center"][1:]
+            center = np.array(frame.shape) // 2
+
+            crop = frame[
+                center[0] - side // 2 : center[0] + side // 2,
+                center[1] - side // 2 : center[1] + side // 2,
+            ]
+            # blur crop and find maximum -> use as center location
+            blurred = gaussian_filter(crop, sigma, mode="nearest")
+            # add crop offset (center - side//2) to get actual location on frame
+            ds.attrs["Center location"] = np.unravel_index(
+                blurred.argmax(), crop.shape
+            ) + (center - side // 2)
+
     def _update_gui_progess(self):
         """If using the GUI update features with progress"""
         value = int(
@@ -667,11 +696,21 @@ class hdf5Intermediate(h5py.File):
             logger.debug(f"final rotator index not found, error: {e}")
             finrot = None
         try:
-            dim = round(np.sqrt(finrot), 6)
-            if not dim == int(dim):
-                raise Exception
+            if (
+                "scan_dim_x" in self["Scan"].attrs
+                and "scan_dim_y" in self["Scan"].attrs
+            ):
+                dim = (
+                    self["Scan"].attrs["scan_dim_x"],
+                    self["Scan"].attrs["scan_dim_y"],
+                )
+
             else:
-                dim = int(dim)
+                dim = round(np.sqrt(finrot), 6)
+                if not dim == int(dim):
+                    raise Exception
+                else:
+                    dim = int(dim)
         except Exception:
             logger.debug("Could not calculate scan dimensions")
             dim = None
@@ -815,7 +854,9 @@ class hdf5Intermediate(h5py.File):
                         and xmax < sdimx
                         and ymax < sdimy
                     ):
-                        sel = sel[ymin:ymax, xmin:xmax]
+                        sel = sel[
+                            ymin : ymax + 1, xmin : xmax + 1
+                        ]  # +1 to include final frame
                     else:
                         logger.warning(
                             "Aborting crop due to incorrect given dimensions: {}".format(
