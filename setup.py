@@ -5,7 +5,7 @@ with open("README.md") as f:
 
 setup(
     name="tvipsconverter",
-    version="0.1.2",
+    version="0.1.3",
     description=(
         "GUI converter for movie data from TVIPS cameras"
         "into other formats like .blo, .tiff and .hspy."
