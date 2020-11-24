@@ -5,7 +5,7 @@ with open("README.md") as f:
 
 setup(
     name="tvipsconverter",
-    version="0.1.2",
+    version="0.1.3",
     description=(
         "GUI converter for movie data from TVIPS cameras"
         "into other formats like .blo, .tiff and .hspy."
@@ -27,7 +27,7 @@ setup(
               'tvipsconverter = tvipsconverter.widgets:main',
           ],
       },
-    package_data={'': ['tvipsconverter/widget_2.ui']},
+    package_data={'': ['tvipsconverter/widget.ui']},
     include_package_data=True,
     install_requires=[
         'numpy',
