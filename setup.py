@@ -27,7 +27,7 @@ setup(
               'tvipsconverter = tvipsconverter.widgets:main',
           ],
       },
-    package_data={'': ['tvipsconverter/widget_2.ui']},
+    package_data={'': ['tvipsconverter/widget.ui']},
     include_package_data=True,
     install_requires=[
         'numpy',
