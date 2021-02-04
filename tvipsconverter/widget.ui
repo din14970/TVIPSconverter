@@ -157,7 +157,7 @@
             <x>0</x>
             <y>0</y>
             <width>1115</width>
-            <height>780</height>
+            <height>741</height>
            </rect>
           </property>
           <layout class="QHBoxLayout" name="horizontalLayout_11">
@@ -613,15 +613,22 @@
                    <property name="toolTip">
                     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;x and y offset of the virtual aperture from the center of the image.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                    </property>
-                   <layout class="QHBoxLayout" name="horizontalLayout_3">
-                    <item>
-                     <widget class="QLabel" name="label_21">
+                   <layout class="QGridLayout" name="gridLayout_13">
+                    <item row="0" column="4">
+                     <widget class="QLabel" name="label_26">
                       <property name="text">
-                       <string>x-offset</string>
+                       <string>pixels</string>
                       </property>
                      </widget>
                     </item>
-                    <item>
+                    <item row="1" column="2">
+                     <widget class="QLabel" name="label_20">
+                      <property name="text">
+                       <string>pixels</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="0" column="1">
                      <widget class="QSpinBox" name="spinBox_13">
                       <property name="minimum">
                        <number>-100000</number>
@@ -631,31 +638,21 @@
                       </property>
                      </widget>
                     </item>
-                    <item>
+                    <item row="0" column="0">
+                     <widget class="QLabel" name="label_21">
+                      <property name="text">
+                       <string>x-offset</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="0" column="2">
                      <widget class="QLabel" name="label_22">
                       <property name="text">
                        <string>y-offset</string>
                       </property>
                      </widget>
                     </item>
-                    <item>
-                     <widget class="QSpinBox" name="spinBox_14">
-                      <property name="minimum">
-                       <number>-100000</number>
-                      </property>
-                      <property name="maximum">
-                       <number>100000</number>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <widget class="QLabel" name="label_26">
-                      <property name="text">
-                       <string>pixels</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
+                    <item row="0" column="5">
                      <spacer name="horizontalSpacer_4">
                       <property name="orientation">
                        <enum>Qt::Horizontal</enum>
@@ -668,20 +665,17 @@
                       </property>
                      </spacer>
                     </item>
-                   </layout>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QWidget" name="widget_2" native="true">
-                   <layout class="QHBoxLayout" name="horizontalLayout_6">
-                    <item>
-                     <widget class="QLabel" name="label_19">
-                      <property name="text">
-                       <string>Aperture radius</string>
+                    <item row="0" column="3">
+                     <widget class="QSpinBox" name="spinBox_14">
+                      <property name="minimum">
+                       <number>-100000</number>
+                      </property>
+                      <property name="maximum">
+                       <number>100000</number>
                       </property>
                      </widget>
                     </item>
-                    <item>
+                    <item row="1" column="1">
                      <widget class="QSpinBox" name="spinBox_12">
                       <property name="minimum">
                        <number>1</number>
@@ -694,14 +688,14 @@
                       </property>
                      </widget>
                     </item>
-                    <item>
-                     <widget class="QLabel" name="label_20">
+                    <item row="1" column="0">
+                     <widget class="QLabel" name="label_19">
                       <property name="text">
-                       <string>pixels</string>
+                       <string>Aperture radius</string>
                       </property>
                      </widget>
                     </item>
-                    <item>
+                    <item row="1" column="3" colspan="3">
                      <spacer name="horizontalSpacer_3">
                       <property name="orientation">
                        <enum>Qt::Horizontal</enum>
@@ -713,6 +707,59 @@
                        </size>
                       </property>
                      </spacer>
+                    </item>
+                    <item row="2" column="0">
+                     <widget class="QCheckBox" name="checkBox_refine_center">
+                      <property name="toolTip">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The direct beam location will be refined and stored as metadata for each frame. This is done by blurring (sigma) a small central region (of diameter box size) and finding the peak position. Therefore box size should be large enough to encompass the direct beam entirely for all scnning pixels and sigma should be at least the disk radius.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="text">
+                       <string>Refine direct beam position:</string>
+                      </property>
+                      <property name="checked">
+                       <bool>true</bool>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="5">
+                     <widget class="QSpinBox" name="spinBox_refine_center_sigma">
+                      <property name="toolTip">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sigma should be set at least as large as the direct beam disk radius to accurately find the center point.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="value">
+                       <number>5</number>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="4">
+                     <widget class="QLabel" name="label_41">
+                      <property name="toolTip">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sigma should be set at least as large as the direct beam disk radius to accurately find the center point.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="text">
+                       <string>Sigma</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="3">
+                     <widget class="QSpinBox" name="spinBox_refine_center_diameter">
+                      <property name="toolTip">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Diameter of the bo in which the direct beam spot will be found for all scanning positions.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="value">
+                       <number>50</number>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="2">
+                     <widget class="QLabel" name="label_40">
+                      <property name="toolTip">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Diameter of the bo in which the direct beam spot will be found for all scanning positions.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="text">
+                       <string>Box size</string>
+                      </property>
+                     </widget>
                     </item>
                    </layout>
                   </widget>
@@ -732,80 +779,33 @@
                     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The maximum diffraction pattern represents the maximum intensity at each diffraction pattern pixel for all scanning positions. It is therefore instructive to the diffraction intensities recorded.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                    </property>
                    <property name="text">
-                    <string>Calculate maximum diffraction pattern</string>
+                    <string>Maximum frame</string>
                    </property>
                    <property name="checked">
                     <bool>true</bool>
                    </property>
                   </widget>
                  </item>
-                 <item row="2" column="4">
-                  <widget class="QSpinBox" name="spinBox_refine_center_sigma">
+                 <item row="0" column="1">
+                  <widget class="QCheckBox" name="checkBox_sum_image">
                    <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sigma should be set at least as large as the direct beam disk radius to accurately find the center point.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                   </property>
-                   <property name="value">
-                    <number>5</number>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="2" column="3">
-                  <widget class="QLabel" name="label_41">
-                   <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sigma should be set at least as large as the direct beam disk radius to accurately find the center point.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Calculate the sum of each frame and store in the frame attributes as 'framesum'.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                    </property>
                    <property name="text">
-                    <string>Sigma</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="2" column="0">
-                  <widget class="QCheckBox" name="checkBox_refine_center">
-                   <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The direct beam location will be refined and stored as metadata for each frame. This is done by blurring (sigma) a small central region (of diameter box size) and finding the peak position. Therefore box size should be large enough to encompass the direct beam entirely for all scnning pixels and sigma should be at least the disk radius.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                   </property>
-                   <property name="text">
-                    <string>Refine direct beam position</string>
+                    <string>Sum frame</string>
                    </property>
                    <property name="checked">
                     <bool>true</bool>
                    </property>
                   </widget>
                  </item>
-                 <item row="2" column="1">
-                  <widget class="QLabel" name="label_40">
-                   <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Diameter of the bo in which the direct beam spot will be found for all scanning positions.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                   </property>
-                   <property name="text">
-                    <string>Box size</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="2" column="2">
-                  <widget class="QSpinBox" name="spinBox_refine_center_diameter">
-                   <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Diameter of the bo in which the direct beam spot will be found for all scanning positions.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                   </property>
-                   <property name="value">
-                    <number>50</number>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="0" colspan="5">
-                  <widget class="Line" name="line">
-                   <property name="orientation">
-                    <enum>Qt::Horizontal</enum>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="0" column="1" colspan="4">
+                 <item row="0" column="2" colspan="2">
                   <widget class="QCheckBox" name="checkBox_average_image">
                    <property name="toolTip">
                     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The average diffraction pattern represents the average intensity at each diffraction pattern pixel for all scanning positions. It is therefore instructive to the average diffraction over the whole scanning area.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                    </property>
                    <property name="text">
-                    <string>Calculate average diffraction pattern</string>
+                    <string>Average frame</string>
                    </property>
                    <property name="checked">
                     <bool>true</bool>
@@ -1168,7 +1168,7 @@
                 <x>0</x>
                 <y>0</y>
                 <width>1069</width>
-                <height>628</height>
+                <height>717</height>
                </rect>
               </property>
               <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -1416,7 +1416,7 @@
                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Frame in the stream where the scan began&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                        </property>
                        <property name="text">
-                        <string>Scan start frame</string>
+                        <string>Start</string>
                        </property>
                       </widget>
                      </item>
@@ -1566,7 +1566,7 @@
                         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Frame at which the scanning stopped. If not auto-calculated must be (first frame + scan dim x * scan dim y)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                        </property>
                        <property name="text">
-                        <string>Scan stop frame</string>
+                        <string>Stop</string>
                        </property>
                       </widget>
                      </item>
@@ -1581,6 +1581,34 @@
                        <property name="text">
                         <string>pixels</string>
                        </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="4">
+                      <widget class="QComboBox" name="comboBox_hyst_dir">
+                       <item>
+                        <property name="text">
+                         <string>x</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>y</string>
+                        </property>
+                       </item>
+                      </widget>
+                     </item>
+                     <item row="7" column="1">
+                      <widget class="QComboBox" name="comboBox_snakescan_dir">
+                       <item>
+                        <property name="text">
+                         <string>x</string>
+                        </property>
+                       </item>
+                       <item>
+                        <property name="text">
+                         <string>y</string>
+                        </property>
+                       </item>
                       </widget>
                      </item>
                     </layout>
@@ -1750,6 +1778,39 @@
                      <string>8-bit conversion</string>
                     </property>
                     <layout class="QGridLayout" name="gridLayout_12">
+                     <item row="0" column="0">
+                      <widget class="QCheckBox" name="checkBox_rescale">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If checked then the intensities in each frame will be rescaled between 0 and 255.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="text">
+                        <string>Rescale intensities across 8-bit range</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="2">
+                      <widget class="QCheckBox" name="checkBox_clipmax_blo">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Clip maximum value in diffraction patterns to this value.  It is recommended to use in conjunction with rescale in order to take full advantage of these capabilities.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="text">
+                        <string>Clip maximum value</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="3">
+                      <widget class="QSpinBox" name="spinBox_clipmax_blo">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Clip maximum value in diffraction patterns to this value.  It is recommended to use in conjunction with rescale in order to take full advantage of these capabilities.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="maximum">
+                        <number>65535</number>
+                       </property>
+                       <property name="value">
+                        <number>65535</number>
+                       </property>
+                      </widget>
+                     </item>
                      <item row="0" column="1">
                       <spacer name="horizontalSpacer_15">
                        <property name="orientation">
@@ -1763,15 +1824,48 @@
                        </property>
                       </spacer>
                      </item>
-                     <item row="0" column="0">
-                      <widget class="QCheckBox" name="checkBox_rescale">
-                       <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If checked then the intensities in each frame will be rescaled between 0 and 255.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                       </property>
+                    </layout>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QGroupBox" name="groupBox_13">
+                    <property name="title">
+                     <string>Other</string>
+                    </property>
+                    <layout class="QGridLayout" name="gridLayout_14">
+                     <item row="0" column="3">
+                      <widget class="QCheckBox" name="checkBox_center_frame">
                        <property name="text">
-                        <string>Rescale intensities across 8-bit range</string>
+                        <string>Center each frame?</string>
                        </property>
                       </widget>
+                     </item>
+                     <item row="0" column="1">
+                      <widget class="QSpinBox" name="spinBox_binning_blo">
+                       <property name="suffix">
+                        <string>x</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="0">
+                      <widget class="QCheckBox" name="checkBox_binning_blo">
+                       <property name="text">
+                        <string>Apply binning</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="2">
+                      <spacer name="horizontalSpacer_16">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
                      </item>
                     </layout>
                    </widget>

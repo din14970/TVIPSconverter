@@ -185,8 +185,7 @@ def get_header_dtype_list(endianess="<"):
 
 
 def get_default_header(endianess="<"):
-    """Returns a header pre-populated with default values.
-    """
+    """Returns a header pre-populated with default values."""
     dt = np.dtype(get_header_dtype_list())
     header = np.zeros((1,), dtype=dt)
     header["ID"][0] = "IMGBLO".encode()
@@ -483,6 +482,23 @@ class bloFileWriter(QThread):
 
     def convert_to_blo(self):
         endianess = "<"
+
+        # add optional parameters to blo header too
+        # None is deafault for not set
+        _options = dict()
+        _options["Recentering"] = (
+            True if "recenter" in self.options and self.options["recenter"] else False
+        )
+        _options["Binning"] = (
+            self.options["binning"] if "binning" in self.options else None
+        )
+        _options["Rescale"] = (
+            self.options["rescale"] if "rescale" in self.options else None
+        )
+        _options["Clip value"] = (
+            self.options["clip_max"] if "clip_max" in self.options else None
+        )
+
         header, note = get_header(
             self.shape,
             self.scan_scale,
@@ -493,9 +509,11 @@ class bloFileWriter(QThread):
             Distortion_N01=1.0,
             Distortion_N09=1.0,
             Note="Reconstructed from TVIPS image stream",
+            **_options,
         )
 
         logger.debug("Created header of blo file")
+
         with open(self.path_blo, "wb") as f:
             # Write header
             header.tofile(f)
@@ -513,7 +531,7 @@ class bloFileWriter(QThread):
             # Zero pad until next data block
             if f.tell() > int(header["Data_offset_2"]):
                 raise ValueError(
-                    "Signal navigation size does not match " "data dimensions."
+                    "Signal navigation size does not match data dimensions."
                 )
             zero_pad = int(header["Data_offset_2"]) - f.tell()
             np.zeros((zero_pad,), np.byte).tofile(f)
@@ -528,12 +546,54 @@ class bloFileWriter(QThread):
             for j, indx in enumerate(self.indexes):
                 dp_head.tofile(f)
                 c = f"{indx}".zfill(6)
-                img = self.fh["ImageStream"][f"Frame_{c}"][:]
+
+                # get reference to dset for recentering
+                frame = self.fh["ImageStream"][f"Frame_{c}"]
+                img = frame[:]
+
+                if "recenter" in self.options and self.options["recenter"]:
+                    # recenter frame according to the calculated frame center position
+                    try:
+                        center = frame.attrs["centercoordinate"]
+                        image_center = np.array(img.shape) // 2
+
+                        # roll by difference between center and frame_center
+                        difference = image_center - center
+
+                        # don't roll array, but rather pad and crop
+                        pad = tuple(
+                            (i if i > 0 else 0, -i if i < 0 else 0) for i in difference
+                        )
+                        slices = tuple(
+                            slice(None if i > 0 else -i, -i if i > 0 else None)
+                            for i in difference
+                        )
+                        # apply mask, if float then multiply, if bool then False values become 0 anyway
+                        img = np.pad(img, pad, mode="edge")[slices]
+                    except Exception as err:
+                        logger.warning("Frame not centered:", err)
+
+                if "binning" in self.options and self.options["binning"] is not None:
+                    img = imagefun.bin_box(img, self.options["binning"], dtype=True)
+
+                if "clip_max" in self.options and self.options["clip_max"] is not None:
+                    # define default clip limit
+                    _max = self.options["clip_max"]
+                else:
+                    # use default limit (max)
+                    _max = None
 
                 if "rescale" in self.options and self.options["rescale"]:
-                    img = imagefun.normalize_convert(img, dtype=np.uint8)
+                    img = imagefun.normalize_convert(img, dtype=np.uint8, max=_max)
                 else:
-                    img = util.img_as_ubyte(img)
+                    if isinstance(img.ravel()[0], np.floating) and img.max() > 1.0:
+                        logger.warning('Cannot reliably change dtype for floats with maximum value >1. Rescaling instead.')
+                        img = imagefun.normalize_convert(img, dtype=np.uint8, max=_max)
+                    else:
+                        # apply clipping if required then convert to 8-bit
+                        if _max is not None:
+                            img[img > _max] = _max
+                        img = util.img_as_ubyte(img)
                 img.astype(endianess + "u1").tofile(f)
                 dp_head["ID"] += 1
                 self.update_gui_progress(j)
@@ -601,4 +661,3 @@ def file_writer_array(filename, array, scan_scale, diff_scale, **kwds):
             dp_head.tofile(f)
             img.astype(endianess + "u1").tofile(f)
             dp_head["ID"] += 1
-

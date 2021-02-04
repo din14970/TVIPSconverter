@@ -1,6 +1,7 @@
 ﻿import numpy as np
 import os.path
 from scipy.ndimage import gaussian_filter
+from skimage.feature import peak_local_max
 from tifffile import FileHandle
 import math
 import h5py
@@ -273,6 +274,9 @@ class Recorder(QThread):
             # as datatype is typcially 8- or 16-bit then 32-bit image should be fine
             self.average_image = np.zeros_like(pff, dtype=np.float32)
 
+        if "calcsum" in self.options and self.options["calcsum"]:
+            self.frame_total = []
+
         self.scangroup = self.stream.create_group("Scan")
         # do we need a virtual bright field calculated?
         if self.vbfproc["calcvbf"]:
@@ -286,6 +290,7 @@ class Recorder(QThread):
             for k, v in self.vbfproc.items():
                 sgp.attrs[k] = v
             self.vbfs = []
+
         # the start and stop frames
         # for convenience we also store rotation
         # indexes. For the end index we go backwards.
@@ -531,9 +536,53 @@ class Recorder(QThread):
             ds.attrs[i[0]] = header[i[0]]
         # store the rotation index for finding start and stop later
         self.rotidxs.append(header["rotidx"])
+
+        # refine center before calc VBf to use this as center
+        if (
+            "refine_center" in self.options and self.options["refine_center"][0]
+        ):  # make sure is checked
+            side, sigma = self.options["refine_center"][1:]
+            center = np.array(frame.shape) // 2
+
+            crop = frame[
+                center[0] - side // 2 : center[0] + side // 2,
+                center[1] - side // 2 : center[1] + side // 2,
+            ]
+            # blur crop and find maximum -> use as center location
+            blurred = gaussian_filter(crop, sigma, mode="nearest")
+            # add crop offset (center - side//2) to get actual location on frame
+
+            # NOTE: argmax does not work in some cases where direct beam
+            # is not most intense reflection
+            # leave code here for legacy
+            # coords_center =  np.unravel_index(blurred.argmax(), crop.shape)
+
+            # get all peaks in blurred image (at least sigma away from each other)
+            coords = peak_local_max(blurred, sigma, exclude_border=1)
+            # get peak closest to center
+            coords_center = coords[
+                np.linalg.norm(coords - np.array(blurred.shape) // 2, axis=1).argmin()
+            ]
+            # and reintroduce offset
+            ds.attrs["centercoordinate"] = coords_center + (center - side // 2)
+
         # immediately calculate and store the VBF intensity if required
         if self.vbfproc["calcvbf"]:
-            vbf_int = frame[self.mask].mean()
+            if "refine_center" in self.options and self.options["refine_center"][0]:
+                try:
+                    coords_center = (
+                        np.asarray(ds.attrs["centercoordinate"])
+                        - np.array(frame.shape) // 2
+                    )
+                    # should be okay to just roll as VBF should be computed near center of frame
+                    mask = np.roll(self.mask, coords_center, axis=(0, 1))
+                except Exception:  # catch any error and go back to default behaviour
+                    mask = self.mask
+            else:
+                # default back to original behaviour
+                mask = self.mask
+
+            vbf_int = frame[mask].mean()
             self.vbfs.append(vbf_int)
 
         # calculate images as specified in the options
@@ -555,22 +604,11 @@ class Recorder(QThread):
                 axis=0,
             ).sum(axis=0)
 
-        if (
-            "refine_center" in self.options and self.options["refine_center"][0]
-        ):  # make sure is checked
-            side, sigma = self.options["refine_center"][1:]
-            center = np.array(frame.shape) // 2
-
-            crop = frame[
-                center[0] - side // 2 : center[0] + side // 2,
-                center[1] - side // 2 : center[1] + side // 2,
-            ]
-            # blur crop and find maximum -> use as center location
-            blurred = gaussian_filter(crop, sigma, mode="nearest")
-            # add crop offset (center - side//2) to get actual location on frame
-            ds.attrs["Center location"] = np.unravel_index(
-                blurred.argmax(), crop.shape
-            ) + (center - side // 2)
+        if "calcsum" in self.options and self.options["calcsum"]:
+            # add frame sum to frame attrs
+            _ft = np.sum(frame)
+            self.frame_total.append(_ft)
+            ds.attrs["frametotal"] = _ft
 
     def _update_gui_progess(self):
         """If using the GUI update features with progress"""
@@ -623,6 +661,10 @@ class Recorder(QThread):
             self.scangroup.create_dataset("maximum_image", data=self.maximum_image)
         if "calcave" in self.options and self.options["calcave"]:
             self.scangroup.create_dataset("average_image", data=self.average_image)
+        if "calcsum" in self.options and self.options["calcsum"]:
+            self.scangroup.create_dataset(
+                "frame_totals", data=np.array(self.frame_total)
+            )
 
     @staticmethod
     def _virtual_bf_mask(arr, centeroffsetpx=(0, 0), radiuspx=10):
@@ -728,7 +770,9 @@ class hdf5Intermediate(h5py.File):
         start_frame=None,
         end_frame=None,
         hyst=0,
+        hyst_dir='x',
         snakescan=True,
+        snakescan_dir='x',
     ):
         # try to get the rotator data
         try:
@@ -746,7 +790,9 @@ class hdf5Intermediate(h5py.File):
             start_frame=start_frame,
             end_frame=end_frame,
             hyst=hyst,
+            hyst_dir=hyst_dir,
             snakescan=snakescan,
+            snakescan_dir=snakescan_dir,
         )
         logger.debug("Calculated scan indexes")
         if sdimx is None:
@@ -764,8 +810,11 @@ class hdf5Intermediate(h5py.File):
         start_frame=None,
         end_frame=None,
         hyst=0,
+        hyst_dir='x',
         snakescan=True,
+        snakescan_dir='x',
         crop=None,
+        binning=None,
     ):
         scan_indexes = self.calculate_scan_export_indexes(
             sdimx=sdimx,
@@ -773,7 +822,9 @@ class hdf5Intermediate(h5py.File):
             start_frame=start_frame,
             end_frame=end_frame,
             hyst=hyst,
+            hyst_dir=hyst_dir,
             snakescan=snakescan,
+            snakescan_dir=snakescan_dir,
             crop=crop,
         )
         logger.debug("Calculated scan indexes")
@@ -783,6 +834,11 @@ class hdf5Intermediate(h5py.File):
             sdimy = self.sdimy
         try:
             imshap = self["ImageStream"]["Frame_000000"].shape
+            if binning is not None:
+                assert all(
+                    not i % binning for i in imshap
+                ), f"Binning results in unequal split: {imshap} and binning factor {binning}."
+                imshap = tuple(i // binning for i in imshap)
         except Exception:
             raise Exception("Could not find image size")
         if crop is not None:
@@ -799,7 +855,9 @@ class hdf5Intermediate(h5py.File):
         start_frame=None,
         end_frame=None,
         hyst=0,
+        hyst_dir="x",
         snakescan=True,
+        snakescan_dir="x",
         crop=None,
     ):
         """Calculate the indexes of the list of frames to consider for the
@@ -837,9 +895,17 @@ class hdf5Intermediate(h5py.File):
             sel = sel.reshape(sdimy, sdimx)
             # reverse correct even scan lines
             if snakescan:
-                sel[::2] = sel[::2][:, ::-1]
+                if snakescan_dir == "x":
+                    sel[::2] = sel[::2][:, ::-1]
+                elif snakescan_dir == "y":
+                    sel[:, ::2] = sel[:, ::2][::-1, :]
+                else:
+                    logger.warning(f"snakescan_dir: {snakescan_dir} undefined.")
             # hysteresis correction on even scan lines
-            sel[::2] = np.roll(sel[::2], hyst, axis=1)
+            if hyst_dir == "x":
+                sel[::2] = np.roll(sel[::2], hyst, axis=1)
+            elif hyst_dir == "y":
+                sel[:, ::2] = np.roll(sel[:, ::2], hyst, axis=0)
 
             # check for crop
             if crop is not None:
@@ -849,8 +915,9 @@ class hdf5Intermediate(h5py.File):
 
                     if (
                         all(i >= 0 for i in (xmin, ymin))
-                        and xmax < sdimx
-                        and ymax < sdimy
+                        # xmax and ymax are tested such that they are le to shape
+                        and xmax <= sdimx
+                        and ymax <= sdimy
                     ):
                         sel = sel[ymin:ymax, xmin:xmax]  # +1 to include final frame
                     else:

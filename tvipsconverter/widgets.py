@@ -431,7 +431,8 @@ class ConnectedWidget(rawgui):
                 imrange=(start_frame, end_frame),
                 calcmax=self.checkBox_maxiumum_image.isChecked(),  # options kwarg
                 calcave=self.checkBox_average_image.isChecked(),  # options kwarg
-                refine_center=(
+                calcsum=self.checkBox_sum_image.isChecked(),  # options kwarg
+                refine_center=(  # options kwarg
                     self.checkBox_refine_center.isChecked(),
                     self.spinBox_refine_center_diameter.value(),
                     self.spinBox_refine_center_sigma.value(),
@@ -540,7 +541,14 @@ class ConnectedWidget(rawgui):
                 f"hyst: {hyst}"
             )
             self.vbf_data = f.get_vbf_image(
-                sdimx, sdimy, start_frame, end_frame, hyst, snakescan
+                sdimx,
+                sdimy,
+                start_frame,
+                end_frame,
+                hyst,
+                self.comboBox_hyst_dir.currentText(),
+                snakescan,
+                self.comboBox_snakescan_dir.currentText(),
             )
             logger.debug("Succesfully created the VBF array")
             # save the settings for later storage
@@ -646,8 +654,24 @@ class ConnectedWidget(rawgui):
             else:
                 crop = None
 
+            # export binning option setup
+            binning = (
+                self.spinBox_binning_blo.value()
+                if self.checkBox_binning_blo.isChecked()
+                else None
+            )
+
             shape, indexes = f.get_blo_export_data(
-                sdimx, sdimy, start_frame, end_frame, hyst, snakescan, crop=crop
+                sdimx,
+                sdimy,
+                start_frame,
+                end_frame,
+                hyst,
+                self.comboBox_hyst_dir.currentText(),
+                snakescan,
+                self.comboBox_snakescan_dir.currentText(),
+                crop=crop,
+                binning=binning,
             )
             logger.debug(f"Shape: {shape}")
             logger.debug(f"Starting to write {filetyp} file")
@@ -662,6 +686,13 @@ class ConnectedWidget(rawgui):
                     dp_scale,
                     # if rescale button is checked do rescale, otherwise no rescaling selected
                     rescale=self.checkBox_rescale.isChecked(),
+                    clip_max=(
+                        self.spinBox_clipmax_blo.value()
+                        if self.checkBox_clipmax_blo.isChecked()
+                        else None
+                    ),
+                    binning=binning,
+                    recenter=self.checkBox_center_frame.isChecked(),
                 )
             elif filetyp == ".hspy":
                 self.get_thread = hspf.hspyFileWriter(
