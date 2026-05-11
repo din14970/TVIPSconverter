@@ -1,3 +1,5 @@
+> ⚠️ This repository was migrated to [Codeberg](https://codeberg.org/din14970/TVIPSconverter) and most of the TVIPS reading logic was implemented in [RosettaSciIO](https://hyperspy.org/rosettasciio/supported_formats/tvips.html#tvips-format)
+
 # TVIPS converter
 
 ## Cite TVIPS converter
